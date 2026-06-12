@@ -9,8 +9,10 @@ Référence des opérations **JSON Patch (RFC 6902)** acceptées par les endpoin
 > # ou : forest-onboard layout patch --file ops.json --domain folders
 > ```
 > Ce document est extrait du code serveur (`make-layout-patch-patterns.ts` + validateurs Joi,
-> juin 2026). Il est destiné à un humain ou une IA qui doit composer un patch. ⚠️ Snapshot
-> manuel : en cas de 422 inattendu, le serveur a peut-être évolué.
+> juin 2026) et **vérifié exhaustif par extraction automatique : 248 patterns**
+> (229 layout + 12 folders + 7 workflows) — tous couverts ci-dessous. Il est destiné à un
+> humain ou une IA qui doit composer un patch. ⚠️ Snapshot manuel : en cas de 422 inattendu,
+> le serveur a peut-être évolué.
 
 ---
 
@@ -78,8 +80,11 @@ pour récupérer le JSON exact à répliquer.
 add     /collections/<col>/layout/segments/-
         { "name": "VIP", "position": 0, "isVisible": true, "filter": { "aggregator":"and","conditions":[…] } }
 remove  /collections/<col>/layout/segments/<id>
-replace /collections/<col>/layout/segments/<id>/(name|position|isVisible|filter)
-replace /collections/<col>/layout/segments/<id>/columns              (tableau entier)
+replace /collections/<col>/layout/segments/<id>/(name|position|isVisible|icon|filter)
+replace /collections/<col>/layout/segments/<id>/(defaultSortingFieldName|defaultSortingFieldOrder)
+replace /collections/<col>/layout/segments/<id>/(query|connectionName)   // segments SQL
+replace /collections/<col>/layout/segments/<id>/hasColumnsConfiguration  // boolean
+replace /collections/<col>/layout/segments/<id>/columns                  (tableau entier)
 replace /collections/<col>/layout/segments/<id>/columns/<field>/(position|isVisible)
 ```
 
@@ -92,6 +97,7 @@ replace /collections/<col>/layout/segments/<id>/columns/<field>/(position|isVisi
 ```
 replace /collections/<col>/layout/viewEdit/summaryView      (objet : disposition de la fiche)
 replace /collections/<col>/layout/viewEdit/rows/<id>/(position|isVisible|explorerConfiguration)
+replace /collections/<col>/layout/viewEdit/rows/<id>/explorerConfiguration/(displayFieldNames|isVisible|position|recordsPerPage)
 replace /collections/<col>/layout/viewCreate/rows/<id>/(position|isVisible)
 ```
 Charts de la vue détail : mêmes règles que §4, préfixe `/collections/<col>/layout/viewEdit/charts`.
@@ -100,9 +106,9 @@ Charts de la vue détail : mêmes règles que §4, préfixe `/collections/<col>/
 ```
 add     /collections/<col>/layout/viewLists/-
 remove  /collections/<col>/layout/viewLists/<id>
-replace /collections/<col>/layout/viewLists/<id>/(name|position|recordsPerPage|allowJavascript)
+replace /collections/<col>/layout/viewLists/<id>/(name|position|recordsPerPage|allowJavascript|s3Versions)
 ```
-⚠️ La viewList par défaut (`isSmart: false`) ne peut pas être supprimée.
+⚠️ La viewList par défaut (`isSmart: false`) ne peut pas être supprimée. `s3Versions`/`allowJavascript` = smart views.
 
 ### Scope de collection — *premium `scopes`*
 ```
@@ -155,9 +161,21 @@ Exemple complet (testé) — KPI + courbe sur le dashboard :
 Modification / suppression :
 ```
 replace /dashboards/<dashId>/charts/<chartId>            (chart entier)
-replace /dashboards/<dashId>/charts/<chartId>/<prop>     (name|type|aggregator|filter|limit|…)
+replace /dashboards/<dashId>/charts/<chartId>/<prop>
 remove  /dashboards/<dashId>/charts/<chartId>            ou …/<prop> (retire une prop)
 replace /dashboards/<dashId>/charts/<chartId>/displaySettings(/x|/y|/width|/height)
+```
+`<prop>` ∈ : `name`, `description`, `type`*, `aggregator`, `aggregateFieldName`, `sourceCollectionId`*,
+`groupByFieldName`, `fieldName`, `labelFieldName`, `relationshipFieldName`, `filter`, `timeRange`,
+`limit`, `objective`, `numeratorChartId`, `denominatorChartId`, `query`, `connectionName`,
+`apiRoute`, `smartRoute`, `allowJavascript`, `s3Versions`, `displaySettings`.
+
+\* **Changer `type` ou `sourceCollectionId` requiert une op `test`** dans le même lot pour
+affirmer la valeur courante :
+```json
+[{"op":"test","path":".../charts/<id>/type","value":"Value"},
+ {"op":"replace","path":".../charts/<id>/type","value":"Pie"},
+ {"op":"replace","path":".../charts/<id>/groupByFieldName","value":"product"}]
 ```
 
 ---
@@ -185,8 +203,37 @@ add     /workspaces/<id>/components/-
 remove  /workspaces/<id>/components/<id>
 replace /workspaces/<id>/components/<id>/(name|displaySettings|visibility)
 ```
-⚠️ `replace …/components/<id>/options` en bloc est **refusé** (422) malgré sa présence dans la
-whitelist — pour changer les options d'un composant : `remove` + `add` du composant.
+
+### Options de composant : préférer les chemins FINS
+Le `replace …/components/<id>/options` en bloc existe dans la whitelist mais a été **refusé en
+pratique** (422, probablement lié au discriminant polymorphe / ops `test`). Deux solutions sûres :
+**(a)** les chemins fins ci-dessous, **(b)** `remove` + `add` du composant entier.
+
+```
+# composant `collection` (tableau de données)
+replace …/components/<id>/options/(onRowClick|filter|segmentId|viewId)
+replace …/components/<id>/options/(sortingFieldName|sortingOrder|recordsPerPage)
+replace …/components/<id>/options/(showSearchbar|showFilters|showCreate|showActions|showWorkflows|enableSegments)
+add     …/components/<id>/options/visibleColumns/-          { "name":"email", "position":0 }
+remove  …/components/<id>/options/visibleColumns/<field>
+replace …/components/<id>/options/visibleColumns/<field>/position
+
+# composant `smart`
+replace …/components/<id>/options/(componentUrl|styleUrl|templateUrl)
+
+# composants `tabs` / `section` (regroupement d'autres composants)
+add/remove …/components/<id>/options/componentIds/-  |  …/componentIds/<id>
+add/remove …/components/<id>/options/tabs/-          |  …/tabs/<id>
+add/remove …/components/<id>/options/tabs/<id>/componentIds/- | …/<cid>
+```
+
+⚠️ Changer la **collection source** d'un composant requiert une op `test` préalable :
+```json
+[{"op":"test","path":"…/components/<id>/options/collectionId","value":"orders"},
+ {"op":"replace","path":"…/components/<id>/options/filter","value":null}]
+```
+(idem `options/relatedDataFieldName` pour le mode related-data). Les options des composants
+`text`/`divider`/etc. n'ont **pas** de chemins fins → `remove` + `add` du composant.
 
 **Workspace** : `{ id: uuid, name, icon (string|null), position (≥0), components: […] }`
 **Composant** : `{ id: uuid, name, type, displaySettings: {x,y,width,height}, visibility: {"type":"always"}, options }`
@@ -244,6 +291,14 @@ replace /workflows/<uuid>/(name|position|isVisible|segmentIds|bpmnAwsS3Identifie
 
 ---
 
+## 7 bis. Domaine `layout` — inboxes (*premium `inbox`*)
+
+```
+add     /inboxes/-
+remove  /inboxes/<id>
+replace /inboxes/<id>/(name|icon|position|folder|dispatchRule|sortingFields|tasksLimit|unassignAfter|canUsersReassign)
+```
+
 ## 8. Packs premium (sinon `403`)
 
 | Fonctionnalité | Pack requis |
@@ -262,7 +317,9 @@ replace /workflows/<uuid>/(name|position|isVisible|segmentIds|bpmnAwsS3Identifie
    (`isVisible`, `displayName`) — et `isVisible = !is_hidden`.
 3. Patch **atomique** : une op invalide → tout le lot rejeté. Pour expérimenter, envoyer les ops
    risquées **séparément**.
-4. `replace …/components/<id>/options` → 422 : recréer le composant.
+4. `replace …/components/<id>/options` en bloc → 422 : utiliser les chemins fins `options/<prop>`
+   (§6) ou recréer le composant. Changer `type`/`sourceCollectionId` d'un chart ou
+   `collectionId` d'un composant exige une op `test` préalable dans le même lot.
 5. Toujours générer les `id` (uuid v4) soi-même pour les `add` (charts, composants, workspaces, workflows).
 6. `restrictedToSegments: true` sans segment, suppression de la viewList par défaut, item dupliqué
    dans deux dossiers, suppression du dossier principal → refusés par des règles métier dédiées.
