@@ -1,0 +1,120 @@
+/**
+ * Generates a minimal, runnable agent-nodejs project (CommonJS / JavaScript).
+ *
+ * `buildAgentProjectFiles` is pure (returns a filename -> content map) so it can
+ * be snapshot-tested without touching disk; `writeAgentProject` persists them.
+ */
+import {mkdir, writeFile} from 'node:fs/promises'
+import {join} from 'node:path'
+
+export type ScaffoldOptions = {
+  /** Port the agent's standalone server listens on. */
+  agentPort: number
+  /** Locally-generated secret used to sign agent JWTs (never sent to Forest). */
+  authSecret: string
+  /** Connection string the agent introspects at runtime. */
+  databaseUrl: string
+  /** FOREST_ENV_SECRET identifying the Forest environment. */
+  envSecret: string
+  /** Project / package name. */
+  name: string
+  /** Custom Forest server URL; omitted from output when undefined (= production). */
+  serverUrl?: string
+}
+
+function buildPackageJson(name: string): string {
+  const pkg = {
+    dependencies: {
+      '@forestadmin/agent': '^1',
+      '@forestadmin/datasource-sql': '^1',
+      dotenv: '^16',
+      pg: '^8',
+    },
+    name,
+    private: true,
+    scripts: {start: 'node index.js'},
+  }
+
+  return `${JSON.stringify(pkg, null, 2)}\n`
+}
+
+function buildIndexJs(agentPort: number): string {
+  return `require('dotenv').config();
+const { createAgent } = require('@forestadmin/agent');
+const { createSqlDataSource } = require('@forestadmin/datasource-sql');
+
+const agent = createAgent({
+  authSecret: process.env.FOREST_AUTH_SECRET, // signs agent JWTs (local only)
+  envSecret: process.env.FOREST_ENV_SECRET, // identifies the Forest environment
+  forestServerUrl: process.env.FOREST_SERVER_URL || undefined,
+  isProduction: false,
+});
+
+agent
+  .addDataSource(createSqlDataSource(process.env.DATABASE_URL))
+  .mountOnStandaloneServer(Number(process.env.AGENT_PORT || ${agentPort}));
+
+agent.start().catch(error => {
+  console.error(error);
+  process.exit(1);
+});
+`
+}
+
+function buildEnv(options: ScaffoldOptions): string {
+  const lines = [
+    `FOREST_AUTH_SECRET=${options.authSecret}`,
+    `FOREST_ENV_SECRET=${options.envSecret}`,
+  ]
+
+  // Only pin the server URL when it is not the production default.
+  if (options.serverUrl) lines.push(`FOREST_SERVER_URL=${options.serverUrl}`)
+
+  lines.push(`DATABASE_URL=${options.databaseUrl}`, `AGENT_PORT=${options.agentPort}`)
+
+  return `${lines.join('\n')}\n`
+}
+
+function buildGitignore(): string {
+  return ['node_modules/', '.env', '*.log', '.forestadmin-schema.json'].join('\n') + '\n'
+}
+
+function buildReadme(name: string): string {
+  return `# ${name}
+
+Agent Forest Admin généré par \`forest-onboard\`.
+
+## Démarrer
+
+    npm install
+    npm start
+
+## Sécurité
+
+⚠️ Ne committe jamais le fichier \`.env\` : il contient tes secrets Forest.
+`
+}
+
+/** Pure: build the map of files (relative path -> content) for the agent project. */
+export function buildAgentProjectFiles(options: ScaffoldOptions): Record<string, string> {
+  return {
+    '.env': buildEnv(options),
+    '.gitignore': buildGitignore(),
+    'README.md': buildReadme(options.name),
+    'index.js': buildIndexJs(options.agentPort),
+    'package.json': buildPackageJson(options.name),
+  }
+}
+
+/** Write the generated agent project into `targetDir`, creating it if needed. */
+export async function writeAgentProject(targetDir: string, options: ScaffoldOptions): Promise<void> {
+  await mkdir(targetDir, {recursive: true})
+
+  const files = buildAgentProjectFiles(options)
+
+  await Promise.all(
+    Object.entries(files).map(([relativePath, content]) =>
+      writeFile(join(targetDir, relativePath), content, 'utf8'),
+    ),
+  )
+}
