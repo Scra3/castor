@@ -3,6 +3,24 @@ import {Flags} from '@oclif/core'
 
 import {ForestApiClient} from './api-client.js'
 import {resolveServerUrl} from './config.js'
+import {spawnProcess} from './process-utils.js'
+
+/** Best-effort: open a URL in the default browser; never throws. */
+export function openUrl(url: string): void {
+  const [command, args] =
+    process.platform === 'darwin'
+      ? ['open', [url]]
+      : process.platform === 'win32'
+        ? ['cmd', ['/c', 'start', '', url]]
+        : ['xdg-open', [url]]
+
+  try {
+    const child = spawnProcess(command as string, args as string[])
+    child.on('error', () => {})
+  } catch {
+    // ignore — printing the URL is enough
+  }
+}
 
 /** Flags common to every command that talks to the Forest server. */
 export const commonFlags = {

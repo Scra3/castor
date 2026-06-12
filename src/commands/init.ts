@@ -7,7 +7,7 @@ import {basename, join, resolve} from 'node:path'
 import {hasAddressInUse, installAgentDependencies, lastLines, startAgent} from '../services/agent-runner.js'
 import {ForestApiError} from '../services/api-client.js'
 import {AuthError, ensureLoggedIn} from '../services/auth.js'
-import {applyInsecure, commonFlags, makeClient} from '../services/cli-helpers.js'
+import {applyInsecure, commonFlags, makeClient, openUrl} from '../services/cli-helpers.js'
 import {isDefaultServerUrl, resolveAppUrl} from '../services/config.js'
 import {DatabaseError, resolveDatabase} from '../services/database.js'
 import {CreatedProject, ProjectError, createProject} from '../services/project.js'
@@ -34,7 +34,6 @@ export default class Init extends Command {
   static flags = {
     ...commonFlags,
     'database-url': Flags.string({description: 'Connection string Postgres existante (sinon une base Docker est créée)'}),
-    'keep-running': Flags.boolean({default: false, description: 'Garder l’agent en marche jusqu’à Ctrl-C'}),
     name: Flags.string({char: 'n', description: 'Nom du projet Forest (défaut : nom du dossier courant)'}),
     port: Flags.integer({default: DEFAULT_AGENT_PORT, description: 'Port d’écoute de l’agent'}),
     yes: Flags.boolean({char: 'y', default: false, description: 'Mode non-interactif (CI) : aucun prompt'}),
@@ -50,7 +49,14 @@ export default class Init extends Command {
     try {
       // [1/5] Authentication
       this.log('[1/5] Authentification')
-      await ensureLoggedIn({client, interactive, log: m => this.log(m), oauth: flags.oauth, prompts: realPrompts, serverUrl})
+      const session = await ensureLoggedIn({
+        client,
+        interactive,
+        log: m => this.log(m),
+        oauth: flags.oauth,
+        prompts: realPrompts,
+        serverUrl,
+      })
 
       // [2/5] Project creation
       this.log('[2/5] Création du projet')
@@ -105,7 +111,15 @@ export default class Init extends Command {
         this.error(`L’agent n’a pas rejoint le serveur ${serverUrl} sous 90 s. Vérifie qu’il tourne et qu’il y a accès.`)
       }
 
-      await this.reportSuccess({agent, created, keepRunning: flags['keep-running'], serverUrl, slug})
+      await this.reportSuccess({
+        agent,
+        email: session.email,
+        interactive,
+        password: session.password,
+        projectName: forestName,
+        serverUrl,
+        slug,
+      })
     } catch (error) {
       this.handleError(error)
     }
@@ -163,22 +177,36 @@ export default class Init extends Command {
 
   private async reportSuccess(options: {
     agent: ReturnType<typeof startAgent>
-    created: CreatedProject
-    keepRunning: boolean
+    email?: string
+    interactive: boolean
+    password?: string
+    projectName: string
     serverUrl: string
     slug: string
   }): Promise<void> {
     const app = resolveAppUrl(options.serverUrl)
+    const loginUrl = `${app.url}/authentication/login`
 
     this.log('')
-    this.log(`✓ Projet « ${options.created.environmentName} » opérationnel !`)
-    this.log(`  App      : ${app.url}${app.uncertain ? ' (ouvre l’app associée à ce serveur)' : ''}`)
+    this.log(`✓ Projet « ${options.projectName} » opérationnel !`)
     this.log(`  Code     : ./${options.slug}`)
     this.log(`  Relancer : cd ${options.slug} && npm start`)
+    this.log('')
 
-    if (options.keepRunning) {
+    // Credentials box to copy/paste on the login page.
+    this.log('Identifiants pour te connecter :')
+    if (options.email) this.log(`  Email        : ${options.email}`)
+    if (options.password) this.log(`  Mot de passe : ${options.password}`)
+    if (!options.email) this.log('  (ta session existante — pas de mot de passe à saisir)')
+    this.log(`  Login        : ${loginUrl}`)
+
+    // Open the login page so the user can paste the credentials.
+    openUrl(loginUrl)
+
+    // Keep the agent running so the data is live in the app.
+    if (options.interactive) {
       this.log('')
-      this.log('Agent en cours d’exécution. Ctrl-C pour arrêter.')
+      this.log('Agent en cours d’exécution (données live dans l’app). Ctrl-C pour arrêter.')
       await new Promise<void>(resolveWait => {
         process.once('SIGINT', () => resolveWait())
       })

@@ -58,7 +58,7 @@ describe('auth.ensureLoggedIn', () => {
   it('uses FOREST_TOKEN when present, without prompting', async () => {
     const {client, tokens} = fakeClient(() => Promise.reject(new Error('should not login')))
 
-    const token = await ensureLoggedIn({
+    const result = await ensureLoggedIn({
       client,
       credentialsPath: path,
       env: {FOREST_TOKEN: 'env-token'},
@@ -67,7 +67,7 @@ describe('auth.ensureLoggedIn', () => {
       serverUrl,
     })
 
-    expect(token).to.equal('env-token')
+    expect(result.token).to.equal('env-token')
     expect(tokens).to.deep.equal(['env-token'])
   })
 
@@ -76,7 +76,7 @@ describe('auth.ensureLoggedIn', () => {
     await saveToken(serverUrl, stored, path)
     const {client} = fakeClient(() => Promise.reject(new Error('should not login')))
 
-    const token = await ensureLoggedIn({
+    const result = await ensureLoggedIn({
       client,
       credentialsPath: path,
       env: {},
@@ -85,14 +85,14 @@ describe('auth.ensureLoggedIn', () => {
       serverUrl,
     })
 
-    expect(token).to.equal(stored)
+    expect(result.token).to.equal(stored)
   })
 
   it('ignores an expired disk token and logs in interactively', async () => {
     await saveToken(serverUrl, makeJwt(Date.now() / 1000 - 10), path)
     const {client} = fakeClient(() => Promise.resolve({refreshToken: 'r', token: 'fresh-token'}))
 
-    const token = await ensureLoggedIn({
+    const result = await ensureLoggedIn({
       client,
       credentialsPath: path,
       env: {},
@@ -101,7 +101,7 @@ describe('auth.ensureLoggedIn', () => {
       serverUrl,
     })
 
-    expect(token).to.equal('fresh-token')
+    expect(result.token).to.equal('fresh-token')
     expect(await loadToken(serverUrl, path)).to.equal('fresh-token')
   })
 
@@ -126,7 +126,7 @@ describe('auth.ensureLoggedIn', () => {
       return Promise.resolve({refreshToken: 'r', token: 'ok-token'})
     })
 
-    const token = await ensureLoggedIn({
+    const result = await ensureLoggedIn({
       client,
       credentialsPath: path,
       env: {},
@@ -136,7 +136,7 @@ describe('auth.ensureLoggedIn', () => {
       serverUrl,
     })
 
-    expect(token).to.equal('ok-token')
+    expect(result.token).to.equal('ok-token')
     expect(attempts).to.equal(2)
   })
 
@@ -147,7 +147,7 @@ describe('auth.ensureLoggedIn', () => {
       return Promise.resolve({refreshToken: 'r', token: `token-${totp}`})
     })
 
-    const token = await ensureLoggedIn({
+    const result = await ensureLoggedIn({
       client,
       credentialsPath: path,
       env: {},
@@ -157,7 +157,7 @@ describe('auth.ensureLoggedIn', () => {
       serverUrl,
     })
 
-    expect(token).to.equal('token-123456')
+    expect(result.token).to.equal('token-123456')
   })
 
   it('runs the OAuth flow and exchanges for an application token', async () => {
@@ -169,7 +169,7 @@ describe('auth.ensureLoggedIn', () => {
       },
     } as unknown as Parameters<typeof ensureLoggedIn>[0]['client']
 
-    const token = await ensureLoggedIn({
+    const result = await ensureLoggedIn({
       appTokenName: 'forest-onboard @ci',
       client,
       credentialsPath: path,
@@ -181,7 +181,7 @@ describe('auth.ensureLoggedIn', () => {
       serverUrl,
     })
 
-    expect(token).to.equal('app-token-for-forest-onboard @ci')
+    expect(result.token).to.equal('app-token-for-forest-onboard @ci')
     // First the OIDC access token, then the exchanged application token.
     expect(setTokens).to.deep.equal(['oidc-access-token', 'app-token-for-forest-onboard @ci'])
     expect(await loadToken(serverUrl, path)).to.equal('app-token-for-forest-onboard @ci')

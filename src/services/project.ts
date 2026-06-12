@@ -5,7 +5,7 @@
  * Note: the server returns an *existing* project when the name is already taken,
  * so callers should treat `alreadyActive` as a likely name collision.
  */
-/* eslint-disable camelcase -- the Forest server serializes attributes in snake_case */
+ 
 import {ForestApiClient, JsonApiDocument, JsonApiResource} from './api-client.js'
 
 export class ProjectError extends Error {

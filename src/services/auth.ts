@@ -45,6 +45,17 @@ export type EnsureLoggedInOptions = {
   serverUrl: string
 }
 
+/**
+ * Result of a login. `email`/`password` are only present when the user entered
+ * them interactively this run (not for env token / stored token / OAuth), so a
+ * caller can echo them back as copy/paste credentials.
+ */
+export type LoginResult = {
+  email?: string
+  password?: string
+  token: string
+}
+
 /** Raised when login cannot proceed; carries an actionable, user-facing message. */
 export class AuthError extends Error {
   constructor(message: string) {
@@ -68,7 +79,7 @@ async function interactiveLogin(
   client: ForestApiClient,
   prompts: AuthPrompts,
   log: (message: string) => void,
-): Promise<string> {
+): Promise<LoginResult> {
   for (let attempt = 1; attempt <= MAX_CREDENTIAL_ATTEMPTS; attempt++) {
     // eslint-disable-next-line no-await-in-loop
     const email = await prompts.input('Email Forest Admin')
@@ -79,7 +90,7 @@ async function interactiveLogin(
       // eslint-disable-next-line no-await-in-loop
       const session = await client.login(email, password)
 
-      return session.token
+      return {email, password, token: session.token}
     } catch (error) {
       if (includesError(error, SERVER_ERROR.twoFactorRequired)) {
         return totpLogin(client, prompts, email, password, log)
@@ -111,7 +122,7 @@ async function totpLogin(
   email: string,
   password: string,
   log: (message: string) => void,
-): Promise<string> {
+): Promise<LoginResult> {
   for (let attempt = 1; attempt <= MAX_TOTP_ATTEMPTS; attempt++) {
     // eslint-disable-next-line no-await-in-loop
     const code = await prompts.input('Code 2FA')
@@ -120,7 +131,7 @@ async function totpLogin(
       // eslint-disable-next-line no-await-in-loop
       const session = await client.login(email, password, code)
 
-      return session.token
+      return {email, password, token: session.token}
     } catch (error) {
       if (includesError(error, SERVER_ERROR.invalidTotp)) {
         log(`Code 2FA invalide. (tentative ${attempt}/${MAX_TOTP_ATTEMPTS})`)
@@ -139,7 +150,7 @@ async function totpLogin(
  * Resolve a valid bearer token, set it on the client, and return it.
  * Persists tokens obtained through the interactive prompt.
  */
-export async function ensureLoggedIn(options: EnsureLoggedInOptions): Promise<string> {
+export async function ensureLoggedIn(options: EnsureLoggedInOptions): Promise<LoginResult> {
   const {appTokenName, client, credentialsPath, interactive, oauth, oauthLogin, prompts, serverUrl} = options
   const env = options.env ?? process.env
   const log = options.log ?? (() => {})
@@ -148,14 +159,14 @@ export async function ensureLoggedIn(options: EnsureLoggedInOptions): Promise<st
   if (envToken) {
     client.setToken(envToken)
 
-    return envToken
+    return {token: envToken}
   }
 
   const fileToken = await loadToken(serverUrl, credentialsPath)
   if (fileToken && !isTokenExpired(fileToken)) {
     client.setToken(fileToken)
 
-    return fileToken
+    return {token: fileToken}
   }
 
   if (!interactive) {
@@ -164,14 +175,14 @@ export async function ensureLoggedIn(options: EnsureLoggedInOptions): Promise<st
     )
   }
 
-  const token = oauth
+  const result = oauth
     ? await oauthExchange(client, serverUrl, appTokenName, oauthLogin, log)
     : await interactiveLogin(client, prompts, log)
 
-  client.setToken(token)
-  await saveToken(serverUrl, token, credentialsPath)
+  client.setToken(result.token)
+  await saveToken(serverUrl, result.token, credentialsPath)
 
-  return token
+  return result
 }
 
 /**
@@ -184,11 +195,11 @@ async function oauthExchange(
   appTokenName: string | undefined,
   oauthLogin: ((serverUrl: string) => Promise<string>) | undefined,
   log: (message: string) => void,
-): Promise<string> {
+): Promise<LoginResult> {
   const runOAuth = oauthLogin ?? (url => loginWithOAuth(url, {log}))
   const accessToken = await runOAuth(serverUrl)
 
   client.setToken(accessToken)
 
-  return client.createApplicationToken(appTokenName ?? `forest-onboard @${hostname()}`)
+  return {token: await client.createApplicationToken(appTokenName ?? `forest-onboard @${hostname()}`)}
 }

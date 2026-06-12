@@ -76,12 +76,15 @@ function redactBody(body: unknown): unknown {
 /** Extract a readable message from a JSON:API error document or raw text. */
 function extractDetail(rawBody: string): string {
   try {
-    const parsed = JSON.parse(rawBody) as {errors?: Array<{detail?: string; title?: string}>; message?: string}
+    const parsed = JSON.parse(rawBody) as {
+      errors?: Array<{detail?: string; message?: string; title?: string}>
+      message?: string
+    }
 
     if (Array.isArray(parsed.errors) && parsed.errors.length > 0) {
       const first = parsed.errors[0]
 
-      return first.detail || first.title || rawBody
+      return first.detail || first.message || first.title || rawBody
     }
 
     if (parsed.message) return parsed.message
@@ -163,10 +166,88 @@ export class ForestApiClient {
     return response.secretKey
   }
 
+  /**
+   * GET /api/:domain/:project/:env/:team — raw patchable document.
+   * Works for folders/workflows; for the layout domain the server always
+   * returns [] (no layout column on renderings) — use getRendering instead.
+   */
+  getLayoutDomain(
+    domain: 'folders' | 'workflows',
+    projectName: string,
+    environmentName: string,
+    teamName: string,
+  ): Promise<unknown[]> {
+    const path = [domain, projectName, environmentName, teamName].map(s => encodeURIComponent(s)).join('/')
+
+    return this.request<unknown[]>('GET', `/api/${path}`, {auth: true})
+  }
+
+  /** GET /api/renderings/:project/:env/:team — JSON:API rendering (layout source of truth). */
+  getRendering(
+    projectName: string,
+    environmentName: string,
+    teamName: string,
+  ): Promise<{data: JsonApiResource; included?: JsonApiResource[]}> {
+    const path = [projectName, environmentName, teamName].map(s => encodeURIComponent(s)).join('/')
+
+    return this.request<{data: JsonApiResource; included?: JsonApiResource[]}>(
+      'GET',
+      `/api/renderings/${path}`,
+      {auth: true},
+    )
+  }
+
+  /** GET /api/projects/:id/environments — environments with their type. */
+  async listEnvironments(projectId: string): Promise<Array<{id: string; name: string; type?: string}>> {
+    const doc = await this.request<{data: JsonApiResource[]}>(
+      'GET',
+      `/api/projects/${projectId}/environments`,
+      {auth: true},
+    )
+
+    return doc.data.map(e => ({
+      id: e.id,
+      name: (e.attributes?.name as string) ?? e.id,
+      type: (e.attributes?.type as string) ?? undefined,
+    }))
+  }
+
+  /** GET /api/projects — projects visible to the user. */
+  async listProjects(): Promise<Array<{id: string; name: string}>> {
+    const doc = await this.request<{data: JsonApiResource[]}>('GET', '/api/projects', {auth: true})
+
+    return doc.data.map(p => ({id: p.id, name: (p.attributes?.name as string) ?? p.id}))
+  }
+
+  /** GET /api/projects/:id/teams — teams of a project. */
+  async listTeams(projectId: string): Promise<Array<{id: string; name: string}>> {
+    const doc = await this.request<{data: JsonApiResource[]}>('GET', `/api/projects/${projectId}/teams`, {
+      auth: true,
+    })
+
+    return doc.data.map(t => ({id: t.id, name: (t.attributes?.name as string) ?? t.id}))
+  }
+
   /** POST /api/sessions — email/password (+ optional TOTP) login. */
   login(email: string, password: string, timeBasedOneTimePassword?: string): Promise<SessionResponse> {
     return this.request<SessionResponse>('POST', '/api/sessions', {
       body: {email, password, ...(timeBasedOneTimePassword ? {timeBasedOneTimePassword} : {})},
+    })
+  }
+
+  /** PATCH /api/:domain — raw RFC 6902 ops, scoped by env/team headers. 204 expected. */
+  async patchLayoutDomain(
+    domain: 'folders' | 'layout' | 'workflows',
+    ops: Array<{op: string; path: string; value?: unknown}>,
+    context: {environmentId: number; teamId: number},
+  ): Promise<void> {
+    await this.request<void>('PATCH', `/api/${domain}`, {
+      auth: true,
+      body: ops,
+      headers: {
+        'forest-environment-id': String(context.environmentId),
+        'forest-team-id': String(context.teamId),
+      },
     })
   }
 
@@ -205,10 +286,10 @@ export class ForestApiClient {
   private async request<T>(
     method: string,
     path: string,
-    options: {auth?: boolean; body?: unknown} = {},
+    options: {auth?: boolean; body?: unknown; headers?: Record<string, string>} = {},
   ): Promise<T> {
     const url = `${this.serverUrl}${path}`
-    const headers: Record<string, string> = {'Content-Type': 'application/json'}
+    const headers: Record<string, string> = {'Content-Type': 'application/json', ...options.headers}
 
     if (options.auth) {
       if (!this.token) throw new ForestApiError(0, 'Not authenticated: missing token')

@@ -34,6 +34,24 @@ Sans `--database-url`, une base Postgres d'exemple est provisionnée via Docker.
 - `init` — onboarding complet en 5 étapes (auth → projet → base → génération/install → démarrage/vérif).
 - `signup` — créer un nouveau compte Forest Admin (email + mot de passe).
 - `login` / `logout` — gérer la session Forest Admin stockée localement.
+- `layout pull` / `layout diff` / `layout apply` — layout-as-code : exporter le layout
+  (collections, dossiers, workflows) en YAML versionnable, voir le plan de changements,
+  l'appliquer (confirmation, `--dry-run`, patchs atomiques par domaine).
+- `layout patch` — échappatoire experte : envoyer des opérations JSON Patch (RFC 6902)
+  brutes, couvrant 100 % des chemins supportés par le serveur.
+
+### Layout-as-code en 30 secondes
+
+```sh
+forest-onboard layout pull            # exporte → forest-layout.yml (scope mémorisé)
+$EDITOR forest-layout.yml             # renomme, masque des colonnes, ajoute des segments…
+forest-onboard layout diff            # plan lisible (+ --json pour scripter)
+forest-onboard layout apply           # applique (confirmation, --dry-run dispo)
+```
+
+Le scope (projet / environnement / équipe) est résolu automatiquement : projet unique,
+environnement de développement, équipe « Operations » — flags `--project/--env/--team`
+ou sélecteur interactif sinon.
 
 ### Options clés de `init`
 

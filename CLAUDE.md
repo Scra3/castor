@@ -134,6 +134,23 @@ All JSON.
    `agent.log`) — that's what flips `is_active` true. The env's `apiEndpoint` is `localhost`,
    which Forest's cloud does NOT need to reach for a dev environment.
 
+7. **`GET /api/layout/:p/:e/:t` ALWAYS returns `[]`** — by construction: the patch
+   controller reads `rendering['layout']` but the renderings table has no `layout` column
+   (it has sections/collections/dashboards/workspaces/inboxes). The real read path for the
+   layout domain is `GET /api/renderings/:p/:e/:t` (JSON:API, snake_case, resources split
+   into `included`); `src/services/layout/rendering-mapper.ts` inverts it into the
+   patchable configuration shape. Folders/workflows GETs work as documented. Wire quirks:
+   columns expose `is_hidden` (canonical `isVisible = !is_hidden`); resource ids are
+   prefixed `<collection>-<field>`.
+
+8. **Layout PATCH semantics**: body = raw RFC 6902 array; headers `forest-environment-id`
+   + `forest-team-id` required; ids in paths are NAMES or numeric/uuid ids (never array
+   indexes); reorders are `replace .../position`; 422 body carries
+   `Not-supported patch: {op:'…',path:'…'}` (mapped back to the YAML key by
+   `plan-format.ts`). The diff engine only emits ops pre-validated against the whitelist
+   mirror in `patch-rules.ts` — keep it in sync with the server's
+   make-layout-patch-patterns.ts when extending.
+
 ## Auth & credentials
 
 - Token precedence: `FOREST_TOKEN` env > stored file (checked for JWT expiry) > interactive.

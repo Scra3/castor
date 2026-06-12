@@ -1,0 +1,1 @@
+[{"id":"7a0096ed-f46a-4269-9491-f28bde765504","isMain":true,"children":[{"id":"customers","type":"collection","position":1,"isVisible":true},{"id":"orders","type":"collection","position":2,"isVisible":true},{"id":"products","type":"collection","position":3,"isVisible":true}]}]
