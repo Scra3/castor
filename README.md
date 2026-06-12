@@ -53,6 +53,9 @@ Le scope (projet / environnement / équipe) est résolu automatiquement : projet
 environnement de développement, équipe « Operations » — flags `--project/--env/--team`
 ou sélecteur interactif sinon.
 
+📖 **Catalogue complet des patchs** (chemins, formats de valeurs, exemples vérifiés,
+pièges) : [`docs/LAYOUT-PATCHES.md`](docs/LAYOUT-PATCHES.md).
+
 ### Options clés de `init`
 
 | Option | Rôle |

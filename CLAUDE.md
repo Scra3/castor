@@ -151,6 +151,12 @@ All JSON.
    mirror in `patch-rules.ts` — keep it in sync with the server's
    make-layout-patch-patterns.ts when extending.
 
+9. **BEFORE composing any layout patch, read `docs/LAYOUT-PATCHES.md`** — the full catalog
+   of supported paths/ops/value shapes (charts, workspace components, folders, workflows,
+   premium gates, known traps), verified against the live server. Use it instead of
+   re-reading the forestadmin-server source. Manual snapshot (June 2026): on an unexpected
+   422, the server may have evolved — re-check the source patterns then update the doc.
+
 ## Auth & credentials
 
 - Token precedence: `FOREST_TOKEN` env > stored file (checked for JWT expiry) > interactive.
