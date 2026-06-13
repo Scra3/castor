@@ -20,6 +20,8 @@ export type ScaffoldOptions = {
   name: string
   /** Custom Forest server URL; omitted from output when undefined (= production). */
   serverUrl?: string
+  /** URL of a workflow executor to proxy run trigger/status to; omitted when undefined. */
+  workflowExecutorUrl?: string
 }
 
 function buildPackageJson(name: string): string {
@@ -47,6 +49,7 @@ const agent = createAgent({
   authSecret: process.env.FOREST_AUTH_SECRET, // signs agent JWTs (local only)
   envSecret: process.env.FOREST_ENV_SECRET, // identifies the Forest environment
   forestServerUrl: process.env.FOREST_SERVER_URL || undefined,
+  workflowExecutorUrl: process.env.WORKFLOW_EXECUTOR_URL || undefined, // proxy workflow run trigger/status
   isProduction: false,
 });
 
@@ -71,6 +74,8 @@ function buildEnv(options: ScaffoldOptions): string {
   if (options.serverUrl) lines.push(`FOREST_SERVER_URL=${options.serverUrl}`)
 
   lines.push(`DATABASE_URL=${options.databaseUrl}`, `AGENT_PORT=${options.agentPort}`)
+
+  if (options.workflowExecutorUrl) lines.push(`WORKFLOW_EXECUTOR_URL=${options.workflowExecutorUrl}`)
 
   return `${lines.join('\n')}\n`
 }

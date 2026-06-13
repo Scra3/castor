@@ -1,15 +1,14 @@
 /**
  * Typed wrappers over the Forest workflow engine orchestrator API
- * (`/api/workflow-orchestrator/*`). The server wraps every payload in a
- * `{ status, response }` envelope — we unwrap and return `response`.
+ * (`/api/workflow-orchestrator/*`). The server returns the run object directly
+ * (verified live: top-level `id`/`runState`/`workflowHistory`/…), but older
+ * builds wrapped it in `{ status, response }` — so we unwrap `.response` when
+ * present and otherwise return the body as-is.
  */
 import type {ForestApiClient} from '../api-client.js'
 
 import {ForestApiError} from '../api-client.js'
 import {WorkflowError} from './errors.js'
-
-/** The orchestrator's response envelope. */
-type Envelope<T> = {response: T; status?: string; statusCode?: number}
 
 type WorkflowCaller = Pick<ForestApiClient, 'workflowOrchestratorRequest'>
 
@@ -20,9 +19,13 @@ async function call<T>(
   renderingId: number,
   body?: unknown,
 ): Promise<T> {
-  const envelope = await client.workflowOrchestratorRequest<Envelope<T>>(method, subpath, {body, renderingId})
+  const result = await client.workflowOrchestratorRequest<T>(method, subpath, {body, renderingId})
 
-  return envelope.response
+  if (result && typeof result === 'object' && 'response' in result) {
+    return (result as {response: T}).response
+  }
+
+  return result
 }
 
 /** POST /start — begin a workflow run on a record. */

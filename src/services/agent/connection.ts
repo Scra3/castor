@@ -9,9 +9,9 @@
  * (no `/forest`): agent-client already prefixes `/forest/` on every route, so a
  * trailing `/forest` is stripped to avoid hitting `/forest/forest/...`.
  */
-import {readFile} from 'node:fs/promises'
 import {join} from 'node:path'
 
+import {readEnvFile} from '../env-file.js'
 import {AgentError} from './errors.js'
 
 export type AgentConnectionFlags = {
@@ -28,17 +28,6 @@ export type AgentConnection = {
 
 const DEFAULT_PORT = 3310
 
-/** Minimal `.env` parser: `KEY=VALUE` lines, surrounding quotes stripped. */
-function parseEnvFile(content: string): Record<string, string> {
-  const out: Record<string, string> = {}
-  for (const line of content.split('\n')) {
-    const match = /^\s*([\dA-Z_]+)\s*=\s*(.*?)\s*$/.exec(line)
-    if (match) out[match[1]] = match[2].replaceAll(/^["']|["']$/g, '')
-  }
-
-  return out
-}
-
 /** Normalize to the agent ROOT URL: no trailing slash, and strip a trailing `/forest`. */
 function toAgentRoot(rawUrl: string): string {
   return rawUrl.replace(/\/+$/, '').replace(/\/forest$/, '')
@@ -52,7 +41,7 @@ export async function resolveAgentConnection(
   if (flags['project-dir']) {
     const envPath = join(flags['project-dir'], '.env')
     try {
-      fileEnv = parseEnvFile(await readFile(envPath, 'utf8'))
+      fileEnv = await readEnvFile(envPath)
     } catch {
       throw new AgentError(`Cannot read ${envPath} — check --project-dir.`)
     }

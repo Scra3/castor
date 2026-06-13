@@ -52,6 +52,17 @@ describe('scaffolder.buildAgentProjectFiles', () => {
   it('references the agent port in index.js', () => {
     expect(buildAgentProjectFiles(baseOptions)['index.js']).to.contain('3310')
   })
+
+  it('reads WORKFLOW_EXECUTOR_URL in index.js and omits it from .env by default', () => {
+    const files = buildAgentProjectFiles(baseOptions)
+    expect(files['index.js']).to.contain('workflowExecutorUrl: process.env.WORKFLOW_EXECUTOR_URL')
+    expect(files['.env']).to.not.contain('WORKFLOW_EXECUTOR_URL')
+  })
+
+  it('writes WORKFLOW_EXECUTOR_URL into .env when provided', () => {
+    const env = buildAgentProjectFiles({...baseOptions, workflowExecutorUrl: 'http://localhost:3400'})['.env']
+    expect(env).to.contain('WORKFLOW_EXECUTOR_URL=http://localhost:3400')
+  })
 })
 
 describe('scaffolder.writeAgentProject', () => {

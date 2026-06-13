@@ -41,6 +41,8 @@ export type WorkflowFlags = {
 
 export type WorkflowContext = {
   client: ForestApiClient
+  /** The Forest session token (to derive the executor token's user claims). */
+  forestToken: string
   renderingId: number
   scope: LayoutScope
 }
@@ -82,7 +84,7 @@ export async function withWorkflow(
   const {client, serverUrl} = makeClient(flags, m => cmd.log(m))
 
   try {
-    await ensureLoggedIn({
+    const {token: forestToken} = await ensureLoggedIn({
       client,
       interactive,
       log: m => cmd.log(m),
@@ -103,7 +105,7 @@ export async function withWorkflow(
     const renderingId = await resolveRenderingId(client, scope)
 
     try {
-      await fn({client, renderingId, scope})
+      await fn({client, forestToken, renderingId, scope})
     } catch (error) {
       throw mapWorkflowError(error)
     }

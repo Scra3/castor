@@ -10,12 +10,21 @@ import {AuthError, ensureLoggedIn} from '../services/auth.js'
 import {applyInsecure, commonFlags, makeClient, openUrl} from '../services/cli-helpers.js'
 import {isDefaultServerUrl, resolveAppUrl} from '../services/config.js'
 import {DatabaseError, resolveDatabase} from '../services/database.js'
+import {
+  type ExecutorHandle,
+  executorErrorReason,
+  installExecutorDependencies,
+  startExecutor,
+  waitForExecutorReady,
+} from '../services/executor/runner.js'
+import {writeExecutorProject} from '../services/executor/scaffolder.js'
 import {CreatedProject, ProjectError, createProject} from '../services/project.js'
-import {realPrompts} from '../services/prompts.js'
+import {realConfirm, realPrompts} from '../services/prompts.js'
 import {writeAgentProject} from '../services/scaffolder.js'
 import {waitUntilActive} from '../services/verifier.js'
 
 const DEFAULT_AGENT_PORT = 3310
+const DEFAULT_EXECUTOR_PORT = 3400
 const MAX_NAME_ATTEMPTS = 3
 
 /** Turn a free-form project name into a safe directory / npm package name. */
@@ -34,8 +43,11 @@ export default class Init extends Command {
   static flags = {
     ...commonFlags,
     'database-url': Flags.string({description: 'Existing Postgres connection string (otherwise a Docker database is created)'}),
+    'executor-in-memory': Flags.boolean({default: false, description: 'Run the workflow executor with no database'}),
+    'executor-port': Flags.integer({default: DEFAULT_EXECUTOR_PORT, description: 'Workflow executor HTTP port'}),
     name: Flags.string({char: 'n', description: 'Forest project name (default: current directory name)'}),
     port: Flags.integer({default: DEFAULT_AGENT_PORT, description: 'Port the agent listens on'}),
+    'with-executor': Flags.boolean({default: false, description: 'Also set up and start a workflow executor'}),
     yes: Flags.boolean({char: 'y', default: false, description: 'Non-interactive mode (CI): no prompts'}),
   }
 
@@ -74,10 +86,16 @@ export default class Init extends Command {
         targetDir,
       })
 
+      // Decide on the workflow executor before scaffolding so the agent can be wired to it.
+      const withExecutor =
+        flags['with-executor'] ||
+        (interactive && (await realConfirm('Also set up a workflow executor? (needed for the orchestrator engine)')))
+
       // [4/5] Scaffold + install + declare endpoint
       this.log('[4/5] Generating the project and installing')
       const authSecret = randomBytes(32).toString('hex')
       const {port} = flags
+      const executorPort = flags['executor-port']
       await writeAgentProject(targetDir, {
         agentPort: port,
         authSecret,
@@ -85,6 +103,7 @@ export default class Init extends Command {
         envSecret: created.envSecret,
         name: slug,
         serverUrl: isDefaultServerUrl(serverUrl) ? undefined : serverUrl,
+        workflowExecutorUrl: withExecutor ? `http://localhost:${executorPort}` : undefined,
       })
 
       const install = await installAgentDependencies({dir: targetDir, logFile: join(targetDir, 'install.log')})
@@ -111,9 +130,28 @@ export default class Init extends Command {
         this.error(`The agent did not reach the server ${serverUrl} within 90s. Check that it is running and reachable.`)
       }
 
+      // Optional: workflow executor (best-effort — never fails the onboarding).
+      let executor: ExecutorHandle | null = null
+      if (withExecutor) {
+        this.log('[+] Setting up the workflow executor')
+        executor = await this.setupExecutor({
+          agentPort: port,
+          authSecret,
+          databaseUrl: database.databaseUrl,
+          envSecret: created.envSecret,
+          executorPort,
+          inMemory: flags['executor-in-memory'],
+          serverUrl,
+          slug,
+          targetDir,
+        })
+      }
+
       await this.reportSuccess({
         agent,
         email: session.email,
+        executor,
+        executorPort,
         interactive,
         password: session.password,
         projectName: forestName,
@@ -178,6 +216,8 @@ export default class Init extends Command {
   private async reportSuccess(options: {
     agent: ReturnType<typeof startAgent>
     email?: string
+    executor?: ExecutorHandle | null
+    executorPort?: number
     interactive: boolean
     password?: string
     projectName: string
@@ -191,6 +231,10 @@ export default class Init extends Command {
     this.log(`✓ Project "${options.projectName}" is up and running!`)
     this.log(`  Code    : ./${options.slug}`)
     this.log(`  Restart : cd ${options.slug} && npm start`)
+    if (options.executor) {
+      this.log(`  Workflow executor : http://localhost:${options.executorPort} (./${options.slug}/workflow-executor)`)
+    }
+
     this.log('')
 
     // Credentials box to copy/paste on the login page.
@@ -203,16 +247,17 @@ export default class Init extends Command {
     // Open the login page so the user can paste the credentials.
     openUrl(loginUrl)
 
-    // Keep the agent running so the data is live in the app.
+    // Keep the agent (and executor) running so the data is live in the app.
     if (options.interactive) {
       this.log('')
-      this.log('Agent running (live data in the app). Press Ctrl-C to stop.')
+      const what = options.executor ? 'Agent and workflow executor running' : 'Agent running (live data in the app)'
+      this.log(`${what}. Press Ctrl-C to stop.`)
       await new Promise<void>(resolveWait => {
         process.once('SIGINT', () => resolveWait())
       })
     }
 
-    await options.agent.stop()
+    await Promise.all([options.agent.stop(), options.executor?.stop()])
   }
 
   private async resolveProjectName(flagName: string | undefined, interactive: boolean): Promise<string> {
@@ -223,5 +268,55 @@ export default class Init extends Command {
     }
 
     return input({default: basename(process.cwd()), message: 'Forest project name'})
+  }
+
+  /** Scaffold + install + start the workflow executor; best-effort (returns null on failure). */
+  private async setupExecutor(options: {
+    agentPort: number
+    authSecret: string
+    databaseUrl: string
+    envSecret: string
+    executorPort: number
+    inMemory: boolean
+    serverUrl: string
+    slug: string
+    targetDir: string
+  }): Promise<ExecutorHandle | null> {
+    const executorDir = join(options.targetDir, 'workflow-executor')
+
+    await writeExecutorProject(executorDir, {
+      agentUrl: `http://localhost:${options.agentPort}`,
+      authSecret: options.authSecret,
+      databaseUrl: options.inMemory ? undefined : options.databaseUrl,
+      envSecret: options.envSecret,
+      httpPort: options.executorPort,
+      name: options.slug,
+      serverUrl: isDefaultServerUrl(options.serverUrl) ? undefined : options.serverUrl,
+    })
+
+    const install = await installExecutorDependencies({
+      dir: executorDir,
+      logFile: join(executorDir, 'install.log'),
+    })
+    if (install.code !== 0) {
+      this.warn(`Executor npm install failed (see ${join(options.slug, 'workflow-executor', 'install.log')}). Skipped.`)
+
+      return null
+    }
+
+    const handle = startExecutor({
+      dir: executorDir,
+      inMemory: options.inMemory,
+      logFile: join(executorDir, 'executor.log'),
+    })
+    const {output, ready} = await waitForExecutorReady(handle)
+    if (!ready) {
+      await handle.stop()
+      this.warn(`Workflow executor not started: ${executorErrorReason(output)}`)
+
+      return null
+    }
+
+    return handle
   }
 }

@@ -36,11 +36,17 @@ src/
                    #   delete/export/relation/associate/dissociate/action/chart
     workflow/      # drive the workflow engine orchestrator: list/start/resume/continue/
                    #   revise/abort/handle-manually/escalate (orchestrator-engine envs only)
+                   #   + setup-executor (scaffold/install/run the workflow executor)
   services/
+    env-file.ts      # shared `.env` parser/reader (agent + executor topics)
     workflow/        # workflow engine orchestrator API (Forest server, not the agent)
       client.ts      #   typed wrappers over /api/workflow-orchestrator/* (unwrap {response})
       command.ts     #   workflowFlags + withWorkflow (scope → engine gate → renderingId)
       errors.ts      #   WorkflowError
+    executor/        # scaffold + run a @forestadmin/workflow-executor project (Node >= 22.12)
+      scaffolder.ts  #   buildExecutorProjectFiles / writeExecutorProject (.env, package.json)
+      runner.ts      #   install/start + readiness ("Workflow executor ready") + fatal detection
+      errors.ts      #   ExecutorError
     agent/           # drive the running agent via @forestadmin/agent-client
       token.ts       #   mint a HS256 JWT from the agent's FOREST_AUTH_SECRET (node:crypto)
       connection.ts  #   resolve agentUrl (root, no /forest) + authSecret (flag/env/.env)
@@ -146,7 +152,49 @@ node ./bin/run.js workflow resume <runId>
 node ./bin/run.js workflow abort <runId>
 ```
 
-Subcommands: `list, start, resume, continue, revise, abort, handle-manually, escalate`.
+Subcommands: `list, start, resume, continue, revise, abort, handle-manually, escalate,
+trigger` + `setup-executor` (below).
+
+### Assembling state + data, and driving a run (verified end-to-end)
+- **`resume` merges two sources**: the orchestrator returns run STATE
+  (`workflowHistory`, `runState`, step definitions) and the executor stores the per-step
+  DATA (`executionResult`/`selectedRecordRef`) at `GET /runs/:runId`. With `--project-dir`
+  (for the executor token) + `--executor-port/--executor-url`, `resume` fetches the
+  executor run and `assembleRun` stitches them by `stepIndex` (a `.execution` field per
+  history step). `services/workflow/executor-client.ts`.
+- **`trigger <runId> --data '<json>'`** posts `{pendingData}` to the executor's
+  `POST /runs/:runId/trigger` (Bearer minted from `FOREST_AUTH_SECRET`) — the way to submit
+  user input / confirm a step. For an `update-record` step the body is
+  `{"userConfirmed":true,"value":<new value>}` (NOT `{field:value}` — the executor validates
+  it via a strict zod schema → 503 on the wrong shape).
+- **Drive runs via `trigger`, not the poll.** A step claimed by the executor's 30s poll
+  leaves the run in `loading` (navigator: claimed + automatic → `loading`), which is NOT
+  triggerable/continuable. Driving each step with `trigger` keeps it `started`/`pending`.
+  Typical loop: `start` → `trigger` (run step 0) → `continue` (advance to next) →
+  `trigger --data {userConfirmed,value}` (confirm/supply input) → … → `continue` → `finished`.
+
+### `workflow setup-executor` — install + run the executor
+The orchestrator only does work if a **workflow executor** is running (it polls the
+server for pending runs and executes their steps against the agent). `setup-executor`
+scaffolds + `npm install`s + starts a `@forestadmin/workflow-executor` project and keeps
+it running:
+
+```sh
+node ./bin/run.js workflow setup-executor --project-dir ./<slug>            # DB mode
+node ./bin/run.js workflow setup-executor --project-dir ./<slug> --in-memory # no DB
+```
+
+It reads the agent's `.env` (`--project-dir`) for `FOREST_AUTH_SECRET` (must match),
+`FOREST_ENV_SECRET`, `AGENT_PORT` (→ `AGENT_URL`) and `DATABASE_URL`; scaffolds into
+`<project-dir>/workflow-executor/` (`services/executor/{scaffolder,runner}.ts`). `init`
+offers the same via the `--with-executor` flag / an interactive prompt, and wires the
+agent's `WORKFLOW_EXECUTOR_URL` (scaffolder sets
+`workflowExecutorUrl: process.env.WORKFLOW_EXECUTOR_URL` on the agent).
+
+⚠️ **The executor requires Node ≥ 22.12.0.** On older Node the bin exits with a version
+error; the runner detects it (`hasFatalExecutorError`/`executorErrorReason`) and reports
+a clear `ExecutorError`. Readiness is detected from the log line `Workflow executor
+ready` (not an HTTP probe — the koa server rejects non-curl clients, as with the agent).
 
 **Engine gate (critical):** every orchestrator op is server-gated by
 `ensureWorkflowEngineOrchestrator` — the environment's `workflowEngine` must be
