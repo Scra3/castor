@@ -84,7 +84,7 @@ export async function loginWithOAuth(serverUrl: string, deps: OAuthDeps): Promis
 
   // 1. Discover the OIDC endpoints.
   const discovery = await fetchImpl(`${base}/oidc/.well-known/openid-configuration`, {method: 'GET'}).then(readJson)
-  if (!discovery.ok) throw new OAuthError(`Découverte OIDC échouée (HTTP ${discovery.status}).`)
+  if (!discovery.ok) throw new OAuthError(`OIDC discovery failed (HTTP ${discovery.status}).`)
 
   const registrationEndpoint = discovery.data.registration_endpoint as string
   const deviceEndpoint = discovery.data.device_authorization_endpoint as string
@@ -99,12 +99,12 @@ export async function loginWithOAuth(serverUrl: string, deps: OAuthDeps): Promis
     response_types: ['none'],
     token_endpoint_auth_method: 'none',
   })
-  if (!registration.ok) throw new OAuthError(`Enregistrement du client OIDC échoué (HTTP ${registration.status}).`)
+  if (!registration.ok) throw new OAuthError(`OIDC client registration failed (HTTP ${registration.status}).`)
   const clientId = registration.data.client_id as string
 
   // 3. Start the device authorization.
   const device = await postJson(fetchImpl, deviceEndpoint, {client_id: clientId, scope: SCOPES})
-  if (!device.ok) throw new OAuthError(`Demande d’autorisation OIDC échouée (HTTP ${device.status}).`)
+  if (!device.ok) throw new OAuthError(`OIDC authorization request failed (HTTP ${device.status}).`)
 
   const verificationUriComplete = (device.data.verification_uri_complete as string) ||
     (device.data.verification_uri as string)
@@ -118,15 +118,15 @@ export async function loginWithOAuth(serverUrl: string, deps: OAuthDeps): Promis
   //    (which carries the code as a query param — there is no manual entry field).
   const appBase = new URL(verificationUri).origin
   deps.log('')
-  deps.log('Connexion via ton navigateur :')
-  deps.log(`  1. Connecte-toi à Forest (Google, SSO ou email) : ${appBase}`)
-  deps.log('     (tu peux atterrir sur l’accueil après login — c’est normal)')
-  deps.log('  2. Une fois connecté, ouvre ce lien et confirme l’autorisation :')
+  deps.log('Log in through your browser:')
+  deps.log(`  1. Log in to Forest (Google, SSO or email): ${appBase}`)
+  deps.log('     (you may land on the home page after login — that is normal)')
+  deps.log('  2. Once logged in, open this link and confirm the authorization:')
   deps.log('')
   deps.log(`        ${verificationUriComplete}`)
   deps.log('')
-  deps.log(`Code de vérification : ${userCode}`)
-  deps.log('En attente de validation… (Ctrl-C pour annuler)')
+  deps.log(`Verification code: ${userCode}`)
+  deps.log('Waiting for confirmation… (Ctrl-C to cancel)')
   // Open the app login first; the user re-opens the confirm link once logged in.
   openBrowser(appBase)
 
@@ -153,10 +153,10 @@ export async function loginWithOAuth(serverUrl: string, deps: OAuthDeps): Promis
       continue
     }
 
-    if (error === 'expired_token') throw new OAuthError('Le code a expiré. Relance la connexion.')
+    if (error === 'expired_token') throw new OAuthError('The code has expired. Restart the login.')
 
-    throw new OAuthError((result.data.error_description as string) || `Échec de l’autorisation OIDC (${error ?? result.status}).`)
+    throw new OAuthError((result.data.error_description as string) || `OIDC authorization failed (${error ?? result.status}).`)
   }
 
-  throw new OAuthError('Délai dépassé pour la connexion OAuth.')
+  throw new OAuthError('Timed out waiting for the OAuth login.')
 }

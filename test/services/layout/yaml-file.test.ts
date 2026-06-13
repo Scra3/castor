@@ -35,7 +35,7 @@ describe('layout/yaml-file', () => {
   it('writes the guidance header comment', () => {
     const content = serializeLayoutFile(scope, docs, () => new Date())
     expect(content).to.contain('forest-onboard layout pull')
-    expect(content).to.contain('NE PAS les modifier')
+    expect(content).to.contain('DO NOT modify them')
   })
 
   it('omits absent domains and parses partial files', () => {

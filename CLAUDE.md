@@ -32,7 +32,22 @@ src/
     signup.ts      # create an account (email/pass via API, or --oauth in browser)
     login.ts       # authenticate and store the token
     logout.ts      # clear the stored token
+    agent/         # talk to a RUNNING agent: describe/list/get/count/create/update/
+                   #   delete/export/relation/associate/dissociate/action/chart
+    workflow/      # drive the workflow engine orchestrator: list/start/resume/continue/
+                   #   revise/abort/handle-manually/escalate (orchestrator-engine envs only)
   services/
+    workflow/        # workflow engine orchestrator API (Forest server, not the agent)
+      client.ts      #   typed wrappers over /api/workflow-orchestrator/* (unwrap {response})
+      command.ts     #   workflowFlags + withWorkflow (scope → engine gate → renderingId)
+      errors.ts      #   WorkflowError
+    agent/           # drive the running agent via @forestadmin/agent-client
+      token.ts       #   mint a HS256 JWT from the agent's FOREST_AUTH_SECRET (node:crypto)
+      connection.ts  #   resolve agentUrl (root, no /forest) + authSecret (flag/env/.env)
+      client.ts      #   connectToAgent: getRendering→renderingId→mint→createRemoteAgentClient
+      csv.ts         #   `agent export` builds CSV from the list path (the .csv route is broken)
+      command.ts     #   agentFlags + withAgent() orchestration + JSON/query helpers
+      errors.ts      #   AgentError
     config.ts        # resolveServerUrl / resolveAppUrl (prod vs dev vs custom)
     credentials.ts   # token persistence (~/.config/forest-onboard/credentials.json, 0600) + JWT exp
     api-client.ts    # ForestApiClient + ForestApiError (native fetch, injectable for tests)
@@ -75,6 +90,78 @@ Steps performed (see `commands/init.ts`):
 5. **Start + verify** — spawn the agent, poll `GET /api/environments/:id` until `is_active`.
 
 Run the generated agent later with `cd <slug> && npm start` (the DB must be up).
+
+## Driving a running agent (the `agent` topic)
+
+`agent <cmd>` talks to a RUNNING agent over HTTP via `@forestadmin/agent-client`
+(`createRemoteAgentClient`) to query and mutate data and test customizations:
+
+```sh
+node ./bin/run.js agent describe --project-dir ./<slug>            # list collections
+node ./bin/run.js agent describe customers --project-dir ./<slug>  # fields/types/operators
+node ./bin/run.js agent list customers --project-dir ./<slug> --page-size 5
+node ./bin/run.js agent create customers --data '{"email":"a@b.com"}' --project-dir ./<slug>
+node ./bin/run.js agent export orders -o orders.csv --project-dir ./<slug>
+```
+
+Subcommands: `describe, list, get, count, create, update, delete, export,
+relation, associate, dissociate, action, chart`. Output is pretty JSON.
+
+How auth works (see `services/agent/`): the agent validates tokens with
+`koa-jwt({secret: FOREST_AUTH_SECRET})` and signs its own with the SAME secret.
+We hold that secret (it's in the scaffolded `<slug>/.env`), so we **mint a HS256
+JWT locally** (`token.ts`, `node:crypto`) instead of doing the browser OAuth
+dance. `--project-dir` reads the secret + `AGENT_PORT` from that `.env`
+(precedence: `--auth-secret` > `$FOREST_AUTH_SECRET` > `<dir>/.env`).
+
+### GOTCHAS (agent-client — learned the hard way)
+1. **The base URL is the agent ROOT** (`http://localhost:3310`), NOT `/forest`:
+   agent-client already prefixes `/forest/` on every route. `connection.ts`
+   strips a trailing `/forest`.
+2. **The minted token only needs `renderingId`** (camelCase) to pass the agent's
+   permission layer — it calls `RenderingPermissionService.loadPermissions` keyed
+   by it; a missing/undefined rendering → HTTP 500 "Validation failed". We fetch
+   it via `client.getRendering(...).data.id`. `id`/`email` are best-effort extras
+   (roles are disabled on dev envs, so they're not strictly required).
+3. Every request must carry a `timezone` query param — agent-client adds
+   `?timezone=Europe/Paris` automatically; a raw call without it 500s.
+4. **CSV: do not use agent-client's `exportCsv` nor the agent's `/<col>.csv`
+   route.** The route resets non-curl HTTP clients (superagent-buffered,
+   node:http ECONNRESET, native fetch UND_ERR_SOCKET) and agent-client's
+   streaming `exportCsv` never settles. `csv.ts` builds the CSV from the regular
+   (working) list path, paginating until drained.
+
+## Workflow engine orchestrator (the `workflow` topic)
+
+`workflow <cmd>` drives workflow EXECUTIONS at runtime (NOT defining them). Unlike
+`agent`, this is a **Forest SERVER API** (`/api/workflow-orchestrator/*`, same host as
+`ForestApiClient`), authenticated with the user Bearer token + a `forest-rendering-id`
+header. So it reuses `ensureLoggedIn` + `resolveScope` + `getRendering` (for the
+renderingId) — NOT agent-client.
+
+```sh
+node ./bin/run.js workflow list --project "My Project"          # workflow definitions → ids
+node ./bin/run.js workflow start --workflow <uuid> --collection customers --record 1
+node ./bin/run.js workflow resume <runId>
+node ./bin/run.js workflow abort <runId>
+```
+
+Subcommands: `list, start, resume, continue, revise, abort, handle-manually, escalate`.
+
+**Engine gate (critical):** every orchestrator op is server-gated by
+`ensureWorkflowEngineOrchestrator` — the environment's `workflowEngine` must be
+`orchestrator`. `withWorkflow` (`services/workflow/command.ts`) checks this UP FRONT
+via `getEnvironmentWorkflowEngine` and raises a clear `WorkflowError` when the env is
+`browser` (the default), before any orchestrator call. Real e2e therefore needs an
+orchestrator-enabled environment (target it with `--server`/`--env`).
+
+Endpoints (source: `forestadmin-server/packages/private-api/src/domain/workflow-orchestrator`),
+response envelope `{status, response}` (we unwrap `.response`); `runId` is an integer:
+`POST /start {workflowId,collectionId,selectedRecordId}` · `GET /resume/:runId` ·
+`POST /continue/:runId` · `POST /revise {runId,stepIndex}` · `POST /abort/:runId` ·
+`POST /handle-manually/:runId` · `POST /escalate/:runId {inboxId}`. Run states:
+`loading|started|pending|aborted|finished`. The executor-facing endpoints
+(`pending-run`, `update-step`, …, auth `forest-secret-key`) are out of scope.
 
 ## Server API contracts (verified against the running server)
 
@@ -169,7 +256,8 @@ All JSON.
 
 - ESM + `Node16` module resolution → **relative imports need the `.js` extension**.
 - Errors: throw typed errors (`ForestApiError`, `AuthError`, `DatabaseError`, `ProjectError`,
-  `OAuthError`), never raw strings; `init` maps them to clean CLI exits.
-- French user-facing strings; English code/comments.
+  `OAuthError`, `AgentError`), never raw strings; `init` maps them to clean CLI exits.
+- **English everywhere** — user-facing strings AND code/comments (matches the README and these
+  docs). The CLI was fully anglicized in June 2026; do not reintroduce French strings.
 - Add tests for every service (`test/services/*.test.ts`); commands are validated via the
   end-to-end run (and PTY for interactive ones).

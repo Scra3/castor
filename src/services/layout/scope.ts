@@ -34,8 +34,8 @@ function findByFlag(kind: string, flag: string, candidates: Candidate[]): Candid
     candidates.find(c => c.id === flag) ?? candidates.find(c => c.name.toLowerCase() === flag.toLowerCase())
 
   if (!match) {
-    const available = candidates.map(c => `${c.name} (#${c.id})`).join(', ') || 'aucun'
-    throw new ScopeError(`${kind} « ${flag} » introuvable. Disponibles : ${available}.`)
+    const available = candidates.map(c => `${c.name} (#${c.id})`).join(', ') || 'none'
+    throw new ScopeError(`${kind} « ${flag} » not found. Available: ${available}.`)
   }
 
   return match
@@ -67,11 +67,11 @@ async function pick(
   if (preferred) return preferred
 
   if (!options.interactive) {
-    const available = candidates.map(c => c.name).join(', ') || 'aucun'
-    throw new ScopeError(`Plusieurs ${kind.toLowerCase()}s possibles : précise ${flagLabel}. Disponibles : ${available}.`)
+    const available = candidates.map(c => c.name).join(', ') || 'none'
+    throw new ScopeError(`Multiple ${kind.toLowerCase()}s possible: specify ${flagLabel}. Available: ${available}.`)
   }
 
-  if (candidates.length === 0) throw new ScopeError(`Aucun ${kind.toLowerCase()} disponible sur ce compte.`)
+  if (candidates.length === 0) throw new ScopeError(`No ${kind.toLowerCase()} available on this account.`)
 
   return options.prompts.select(
     kind,
@@ -83,14 +83,14 @@ async function pick(
 export async function resolveScope(options: ResolveScopeOptions): Promise<LayoutScope> {
   const {client, flags, fromFile, interactive, prompts, serverUrl} = options
 
-  const project = await pick('Projet', '--project', await client.listProjects(), {
+  const project = await pick('Project', '--project', await client.listProjects(), {
     flag: flags.project,
     fromFileId: fromFile?.projectId,
     interactive,
     prompts,
   })
 
-  const environment = await pick('Environnement', '--env', await client.listEnvironments(project.id), {
+  const environment = await pick('Environment', '--env', await client.listEnvironments(project.id), {
     defaultOf: list => list.find(e => e.type === 'development') ?? list.find(e => e.name === 'Development'),
     flag: flags.env,
     fromFileId: fromFile?.environmentId,
@@ -98,7 +98,7 @@ export async function resolveScope(options: ResolveScopeOptions): Promise<Layout
     prompts,
   })
 
-  const team = await pick('Équipe', '--team', await client.listTeams(project.id), {
+  const team = await pick('Team', '--team', await client.listTeams(project.id), {
     defaultOf: list => list.find(t => t.name === 'Operations'),
     flag: flags.team,
     fromFileId: fromFile?.teamId,

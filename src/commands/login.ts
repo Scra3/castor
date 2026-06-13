@@ -5,7 +5,7 @@ import {applyInsecure, commonFlags, makeClient} from '../services/cli-helpers.js
 import {realPrompts} from '../services/prompts.js'
 
 export default class Login extends Command {
-  static description = 'Se connecter à Forest Admin et stocker le token de session.'
+  static description = 'Log in to Forest Admin and store the session token.'
 
   static flags = {...commonFlags}
 
@@ -24,6 +24,6 @@ export default class Login extends Command {
       serverUrl,
     })
 
-    this.log(`✓ Connecté à ${serverUrl}.`)
+    this.log(`✓ Connected to ${serverUrl}.`)
   }
 }

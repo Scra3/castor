@@ -9,17 +9,17 @@ import {serializeLayoutFile} from '../../services/layout/yaml-file.js'
 import {realConfirm, realPrompts, realSelect} from '../../services/prompts.js'
 
 export default class LayoutPull extends Command {
-  static description = 'Exporter le layout (collections, dossiers, workflows) dans un fichier YAML éditable.'
+  static description = 'Export the layout (collections, folders, workflows) into an editable YAML file.'
 
   static flags = {
     ...commonFlags,
-    domains: Flags.string({default: 'layout,folders,workflows', description: 'Domaines à exporter (layout,folders,workflows)'}),
-    env: Flags.string({description: 'Environnement (nom ou id)'}),
-    file: Flags.string({char: 'f', default: 'forest-layout.yml', description: 'Fichier de sortie'}),
-    force: Flags.boolean({default: false, description: 'Écraser le fichier existant sans confirmation'}),
-    project: Flags.string({description: 'Projet Forest (nom ou id)'}),
-    team: Flags.string({description: 'Équipe (nom ou id)'}),
-    yes: Flags.boolean({char: 'y', default: false, description: 'Mode non-interactif'}),
+    domains: Flags.string({default: 'layout,folders,workflows', description: 'Domains to export (layout,folders,workflows)'}),
+    env: Flags.string({description: 'Environment (name or id)'}),
+    file: Flags.string({char: 'f', default: 'forest-layout.yml', description: 'Output file'}),
+    force: Flags.boolean({default: false, description: 'Overwrite the existing file without confirmation'}),
+    project: Flags.string({description: 'Forest project (name or id)'}),
+    team: Flags.string({description: 'Team (name or id)'}),
+    yes: Flags.boolean({char: 'y', default: false, description: 'Non-interactive mode'}),
   }
 
   async run(): Promise<void> {
@@ -40,11 +40,11 @@ export default class LayoutPull extends Command {
         prompts: {select: realSelect},
         serverUrl,
       })
-      this.log(`Scope : ${scope.projectName} / ${scope.environmentName} / ${scope.teamName}`)
+      this.log(`Scope: ${scope.projectName} / ${scope.environmentName} / ${scope.teamName}`)
 
       if (!flags.force && (await fileExists(flags.file))) {
-        const overwrite = interactive && (await realConfirm(`${flags.file} existe déjà. L'écraser ?`))
-        if (!overwrite) this.error(`${flags.file} existe déjà. Utilise --force pour l'écraser.`)
+        const overwrite = interactive && (await realConfirm(`${flags.file} already exists. Overwrite it?`))
+        if (!overwrite) this.error(`${flags.file} already exists. Use --force to overwrite it.`)
       }
 
       const docs = await fetchDomains(client, scope, domains)
@@ -54,12 +54,12 @@ export default class LayoutPull extends Command {
       const counts = [
         layout?.collections ? `${layout.collections.length} collections` : null,
         layout?.dashboards?.length ? `${layout.dashboards.length} dashboards` : null,
-        docs.folders ? `${docs.folders.length} dossiers` : null,
+        docs.folders ? `${docs.folders.length} folders` : null,
         docs.workflows ? `${docs.workflows.length} workflows` : null,
       ].filter(Boolean)
 
-      this.log(`✓ Layout récupéré → ${flags.file} (${counts.join(', ')})`)
-      this.log('Édite le fichier puis lance `forest-onboard layout diff` pour voir le plan.')
+      this.log(`✓ Layout pulled → ${flags.file} (${counts.join(', ')})`)
+      this.log('Edit the file then run `forest-onboard layout diff` to see the plan.')
     } catch (error) {
       if (error instanceof ScopeError || error instanceof TypeError) this.error(error.message)
       throw error

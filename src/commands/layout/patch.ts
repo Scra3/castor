@@ -10,7 +10,7 @@ import {ScopeError, resolveScope} from '../../services/layout/scope.js'
 import {realConfirm, realPrompts, realSelect} from '../../services/prompts.js'
 
 export default class LayoutPatch extends Command {
-  static description = 'Envoyer des opérations JSON Patch (RFC 6902) brutes au layout — échappatoire experte.'
+  static description = 'Send raw JSON Patch (RFC 6902) operations to the layout — expert escape hatch.'
 
   static examples = [
     `echo '[{"op":"replace","path":"/collections/customers/icon","value":"users"}]' | forest-onboard layout patch --yes`,
@@ -18,12 +18,12 @@ export default class LayoutPatch extends Command {
 
   static flags = {
     ...commonFlags,
-    domain: Flags.string({default: 'layout', description: 'Domaine cible', options: ['layout', 'folders', 'workflows']}),
-    env: Flags.string({description: 'Environnement (nom ou id)'}),
-    file: Flags.string({char: 'f', description: 'Fichier JSON contenant le tableau d’opérations (sinon stdin)'}),
-    project: Flags.string({description: 'Projet Forest (nom ou id)'}),
-    team: Flags.string({description: 'Équipe (nom ou id)'}),
-    yes: Flags.boolean({char: 'y', default: false, description: 'Ne pas demander de confirmation'}),
+    domain: Flags.string({default: 'layout', description: 'Target domain', options: ['layout', 'folders', 'workflows']}),
+    env: Flags.string({description: 'Environment (name or id)'}),
+    file: Flags.string({char: 'f', description: 'JSON file containing the operations array (otherwise stdin)'}),
+    project: Flags.string({description: 'Forest project (name or id)'}),
+    team: Flags.string({description: 'Team (name or id)'}),
+    yes: Flags.boolean({char: 'y', default: false, description: 'Do not ask for confirmation'}),
   }
 
   async run(): Promise<void> {
@@ -35,7 +35,7 @@ export default class LayoutPatch extends Command {
 
     try {
       const ops = await this.readOps(flags.file)
-      if (ops.length === 0) this.error('Aucune opération à envoyer.')
+      if (ops.length === 0) this.error('No operation to send.')
 
       await ensureLoggedIn({client, interactive, log: m => this.log(m), oauth: flags.oauth, prompts: realPrompts, serverUrl})
 
@@ -47,11 +47,11 @@ export default class LayoutPatch extends Command {
         serverUrl,
       })
 
-      this.log(`Scope : ${scope.projectName} / ${scope.environmentName} / ${scope.teamName}`)
+      this.log(`Scope: ${scope.projectName} / ${scope.environmentName} / ${scope.teamName}`)
       for (const op of ops) this.log(`  ${op.op} ${op.path}`)
 
-      if (interactive && !(await realConfirm(`Envoyer ces ${ops.length} opération(s) sur ${flags.domain} ?`))) {
-        this.log('Annulé.')
+      if (interactive && !(await realConfirm(`Send these ${ops.length} operation(s) on ${flags.domain}?`))) {
+        this.log('Cancelled.')
 
         return
       }
@@ -61,11 +61,11 @@ export default class LayoutPatch extends Command {
         teamId: scope.teamId,
       })
 
-      this.log(`✓ ${ops.length} opération(s) appliquée(s) sur ${flags.domain} (${scope.environmentName} / ${scope.teamName}).`)
+      this.log(`✓ ${ops.length} operation(s) applied on ${flags.domain} (${scope.environmentName} / ${scope.teamName}).`)
     } catch (error) {
       if (error instanceof ScopeError) this.error(error.message)
       if (error instanceof ForestApiError) {
-        this.error(`Le serveur a refusé le patch (${error.status}) : ${error.detail}`)
+        this.error(`The server rejected the patch (${error.status}): ${error.detail}`)
       }
 
       throw error
@@ -80,10 +80,10 @@ export default class LayoutPatch extends Command {
     try {
       parsed = JSON.parse(raw)
     } catch {
-      this.error('Entrée invalide : fournis un tableau JSON d’opérations {op, path, value}.')
+      this.error('Invalid input: provide a JSON array of {op, path, value} operations.')
     }
 
-    if (!Array.isArray(parsed)) this.error('L’entrée doit être un TABLEAU JSON d’opérations RFC 6902.')
+    if (!Array.isArray(parsed)) this.error('The input must be a JSON ARRAY of RFC 6902 operations.')
 
     return parsed as JsonPatchOp[]
   }

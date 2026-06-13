@@ -14,17 +14,17 @@ import {computePlan} from './diff.js'
 const DOMAIN_ORDER: LayoutDomain[] = ['layout', 'folders', 'workflows']
 
 export default class LayoutApply extends Command {
-  static description = 'Appliquer le fichier de layout : calcule le plan puis envoie les patchs (atomiques par domaine).'
+  static description = 'Apply the layout file: compute the plan then send the patches (atomic per domain).'
 
   static flags = {
     ...commonFlags,
-    domains: Flags.string({default: 'layout,folders,workflows', description: 'Domaines à appliquer'}),
-    'dry-run': Flags.boolean({default: false, description: 'Afficher le plan sans rien envoyer'}),
-    env: Flags.string({description: 'Environnement (nom ou id)'}),
-    file: Flags.string({char: 'f', default: 'forest-layout.yml', description: 'Fichier de layout'}),
-    project: Flags.string({description: 'Projet Forest (nom ou id)'}),
-    team: Flags.string({description: 'Équipe (nom ou id)'}),
-    yes: Flags.boolean({char: 'y', default: false, description: 'Appliquer sans confirmation'}),
+    domains: Flags.string({default: 'layout,folders,workflows', description: 'Domains to apply'}),
+    'dry-run': Flags.boolean({default: false, description: 'Show the plan without sending anything'}),
+    env: Flags.string({description: 'Environment (name or id)'}),
+    file: Flags.string({char: 'f', default: 'forest-layout.yml', description: 'Layout file'}),
+    project: Flags.string({description: 'Forest project (name or id)'}),
+    team: Flags.string({description: 'Team (name or id)'}),
+    yes: Flags.boolean({char: 'y', default: false, description: 'Apply without confirmation'}),
   }
 
   async run(): Promise<void> {
@@ -46,14 +46,14 @@ export default class LayoutApply extends Command {
         serverUrl,
       })
 
-      this.log(`Scope : ${scope.projectName} / ${scope.environmentName} / ${scope.teamName}`)
+      this.log(`Scope: ${scope.projectName} / ${scope.environmentName} / ${scope.teamName}`)
       this.log('')
       this.log(formatPlan(ops, warnings))
 
       if (ops.length === 0 || flags['dry-run']) return
 
-      if (interactive && !(await realConfirm(`Appliquer ces ${ops.length} opération(s) sur ${scope.environmentName} / ${scope.teamName} ?`))) {
-        this.log('Annulé.')
+      if (interactive && !(await realConfirm(`Apply these ${ops.length} operation(s) on ${scope.environmentName} / ${scope.teamName}?`))) {
+        this.log('Cancelled.')
 
         return
       }
@@ -69,14 +69,14 @@ export default class LayoutApply extends Command {
             environmentId: scope.environmentId,
             teamId: scope.teamId,
           })
-          applied.push(`✓ ${domain} : ${domainOps.length} opération${domainOps.length > 1 ? 's' : ''} appliquée${domainOps.length > 1 ? 's' : ''}.`)
+          applied.push(`✓ ${domain}: ${domainOps.length} operation${domainOps.length > 1 ? 's' : ''} applied.`)
           this.log(applied.at(-1) as string)
         } catch (error) {
           this.reportFailure(error, domain, domainOps, applied)
         }
       }
 
-      this.log('Recharge l’interface Forest Admin pour voir les changements.')
+      this.log('Reload the Forest Admin interface to see the changes.')
     } catch (error) {
       if (error instanceof ScopeError || error instanceof LayoutFileError || error instanceof TypeError) {
         this.error(error.message)
@@ -89,8 +89,8 @@ export default class LayoutApply extends Command {
   /** Stop at the first failing domain, reporting what was and wasn't applied. */
   private reportFailure(error: unknown, domain: LayoutDomain, sentOps: PlannedOp[], applied: string[]): never {
     if (error instanceof ForestApiError) {
-      const status = applied.length > 0 ? `\nDéjà appliqué avant l'erreur :\n${applied.join('\n')}` : ''
-      this.error(`${explainApiError(error, sentOps)}\nLe domaine « ${domain} » n'a PAS été appliqué (patch atomique).${status}`)
+      const status = applied.length > 0 ? `\nAlready applied before the error:\n${applied.join('\n')}` : ''
+      this.error(`${explainApiError(error, sentOps)}\nThe domain "${domain}" was NOT applied (atomic patch).${status}`)
     }
 
     throw error

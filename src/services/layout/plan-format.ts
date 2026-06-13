@@ -9,7 +9,7 @@ export function formatPlan(ops: PlannedOp[], warnings: string[]): string {
   const lines: string[] = []
 
   if (ops.length === 0 && warnings.length === 0) {
-    return '✓ Aucun changement : le layout distant correspond déjà au fichier.'
+    return '✓ No changes: the remote layout already matches the file.'
   }
 
   const domains: LayoutDomain[] = ['layout', 'folders', 'workflows']
@@ -17,7 +17,7 @@ export function formatPlan(ops: PlannedOp[], warnings: string[]): string {
     const domainOps = ops.filter(op => op.domain === domain)
     if (domainOps.length === 0) continue
 
-    lines.push(`${domain} (${domainOps.length} changement${domainOps.length > 1 ? 's' : ''})`)
+    lines.push(`${domain} (${domainOps.length} change${domainOps.length > 1 ? 's' : ''})`)
     for (const op of domainOps) lines.push(`  ${OP_PREFIX[op.op] ?? '·'} ${op.label}`)
   }
 
@@ -28,7 +28,7 @@ export function formatPlan(ops: PlannedOp[], warnings: string[]): string {
       .map(domain => ({count: ops.filter(op => op.domain === domain).length, domain}))
       .filter(d => d.count > 0)
       .map(d => `${d.count} PATCH /api/${d.domain}`)
-    lines.push('', `${ops.length} opération${ops.length > 1 ? 's' : ''} à envoyer (${perDomain.join(', ')}).`)
+    lines.push('', `${ops.length} operation${ops.length > 1 ? 's' : ''} to send (${perDomain.join(', ')}).`)
   }
 
   return lines.join('\n')
@@ -41,23 +41,23 @@ export function explainApiError(error: ForestApiError, sentOps: PlannedOp[]): st
     const offending = match ? sentOps.find(op => op.path === match[1]) : undefined
 
     const origin = offending
-      ? `\n  → provient de : ${offending.yamlPath}\n  Annule cette modification dans le fichier, ou utilise \`layout patch\` en connaissance de cause.`
+      ? `\n  → comes from: ${offending.yamlPath}\n  Revert this change in the file, or use \`layout patch\` if you know what you are doing.`
       : ''
 
-    return `Le serveur a refusé le patch (422) :\n  ${error.detail}${origin}`
+    return `The server rejected the patch (422):\n  ${error.detail}${origin}`
   }
 
   if (error.status === 403) {
     const premium = sentOps.find(op => op.premiumPack)
     if (premium) {
       return (
-        `Fonctionnalité premium requise (pack « ${premium.premiumPack} ») pour ${premium.yamlPath}.\n` +
-        'Rien n’a été appliqué pour ce domaine (patch atomique).'
+        `Premium feature required (pack « ${premium.premiumPack} ») for ${premium.yamlPath}.\n` +
+        'Nothing was applied for this domain (atomic patch).'
       )
     }
 
-    return 'Accès refusé (403) : ton rôle ne permet pas de modifier le layout de cet environnement.'
+    return 'Access denied (403): your role does not allow editing the layout of this environment.'
   }
 
-  return `Erreur serveur (${error.status}) : ${error.detail}`
+  return `Server error (${error.status}): ${error.detail}`
 }

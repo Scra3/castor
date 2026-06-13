@@ -29,7 +29,7 @@ describe('database.validateDatabaseUrl', () => {
   })
 
   it('rejects a malformed URL', () => {
-    expect(() => validateDatabaseUrl('not a url')).to.throw(DatabaseError, /invalide/)
+    expect(() => validateDatabaseUrl('not a url')).to.throw(DatabaseError, /Invalid/)
   })
 })
 

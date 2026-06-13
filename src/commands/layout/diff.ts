@@ -51,17 +51,17 @@ export async function computePlan(options: {
 }
 
 export default class LayoutDiff extends Command {
-  static description = 'Comparer le fichier de layout local avec l’état distant et afficher le plan de changements.'
+  static description = 'Compare the local layout file with the remote state and show the change plan.'
 
   static flags = {
     ...commonFlags,
-    domains: Flags.string({default: 'layout,folders,workflows', description: 'Domaines à comparer'}),
-    env: Flags.string({description: 'Environnement (nom ou id)'}),
-    file: Flags.string({char: 'f', default: 'forest-layout.yml', description: 'Fichier de layout'}),
-    json: Flags.boolean({default: false, description: 'Imprimer les opérations JSON Patch (scriptable)'}),
-    project: Flags.string({description: 'Projet Forest (nom ou id)'}),
-    team: Flags.string({description: 'Équipe (nom ou id)'}),
-    yes: Flags.boolean({char: 'y', default: false, description: 'Mode non-interactif'}),
+    domains: Flags.string({default: 'layout,folders,workflows', description: 'Domains to compare'}),
+    env: Flags.string({description: 'Environment (name or id)'}),
+    file: Flags.string({char: 'f', default: 'forest-layout.yml', description: 'Layout file'}),
+    json: Flags.boolean({default: false, description: 'Print the JSON Patch operations (scriptable)'}),
+    project: Flags.string({description: 'Forest project (name or id)'}),
+    team: Flags.string({description: 'Team (name or id)'}),
+    yes: Flags.boolean({char: 'y', default: false, description: 'Non-interactive mode'}),
   }
 
   async run(): Promise<void> {
@@ -95,7 +95,7 @@ export default class LayoutDiff extends Command {
         return
       }
 
-      this.log(`Scope : ${scope.projectName} / ${scope.environmentName} / ${scope.teamName} (depuis ${flags.file})`)
+      this.log(`Scope: ${scope.projectName} / ${scope.environmentName} / ${scope.teamName} (from ${flags.file})`)
       this.log('')
       this.log(formatPlan(ops, warnings))
     } catch (error) {

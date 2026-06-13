@@ -73,18 +73,18 @@ describe('oauth.loginWithOAuth', () => {
       expect.fail('should have thrown')
     } catch (error) {
       expect(error).to.be.instanceOf(OAuthError)
-      expect((error as OAuthError).message).to.contain('expiré')
+      expect((error as OAuthError).message).to.contain('expired')
     }
   })
 
   it('surfaces an unexpected OIDC error with its description', async () => {
-    const fetchImpl = makeFetch([{body: {error: 'access_denied', error_description: 'Refusé par l’utilisateur'}, status: 400}])
+    const fetchImpl = makeFetch([{body: {error: 'access_denied', error_description: 'Denied by the user'}, status: 400}])
 
     try {
       await loginWithOAuth('http://localhost:3001', {...silentDeps, fetch: fetchImpl})
       expect.fail('should have thrown')
     } catch (error) {
-      expect((error as OAuthError).message).to.contain('Refusé')
+      expect((error as OAuthError).message).to.contain('Denied')
     }
   })
 

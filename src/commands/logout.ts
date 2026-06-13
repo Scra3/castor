@@ -5,7 +5,7 @@ import {resolveServerUrl} from '../services/config.js'
 import {clearToken} from '../services/credentials.js'
 
 export default class Logout extends Command {
-  static description = 'Supprimer le token de session Forest Admin stocké localement.'
+  static description = 'Remove the locally stored Forest Admin session token.'
 
   static flags = {server: commonFlags.server}
 
@@ -15,6 +15,6 @@ export default class Logout extends Command {
 
     await clearToken(serverUrl)
 
-    this.log(`✓ Déconnecté de ${serverUrl}.`)
+    this.log(`✓ Logged out of ${serverUrl}.`)
   }
 }

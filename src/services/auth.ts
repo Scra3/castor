@@ -82,9 +82,9 @@ async function interactiveLogin(
 ): Promise<LoginResult> {
   for (let attempt = 1; attempt <= MAX_CREDENTIAL_ATTEMPTS; attempt++) {
     // eslint-disable-next-line no-await-in-loop
-    const email = await prompts.input('Email Forest Admin')
+    const email = await prompts.input('Forest Admin email')
     // eslint-disable-next-line no-await-in-loop
-    const password = await prompts.password('Mot de passe')
+    const password = await prompts.password('Password')
 
     try {
       // eslint-disable-next-line no-await-in-loop
@@ -98,12 +98,12 @@ async function interactiveLogin(
 
       if (includesError(error, SERVER_ERROR.passwordUnavailable)) {
         throw new AuthError(
-          'Ce compte se connecte via SSO/Google. Relance avec --oauth (ou fournis FOREST_TOKEN).',
+          'This account logs in via SSO/Google. Retry with --oauth (or provide FOREST_TOKEN).',
         )
       }
 
       if (includesError(error, SERVER_ERROR.badCredentials)) {
-        log(`Email ou mot de passe incorrect. (tentative ${attempt}/${MAX_CREDENTIAL_ATTEMPTS})`)
+        log(`Incorrect email or password. (attempt ${attempt}/${MAX_CREDENTIAL_ATTEMPTS})`)
          
         continue
       }
@@ -112,7 +112,7 @@ async function interactiveLogin(
     }
   }
 
-  throw new AuthError('Échec de connexion après plusieurs tentatives.')
+  throw new AuthError('Login failed after several attempts.')
 }
 
 /** Prompt for the 2FA code and retry login until it is accepted or attempts run out. */
@@ -125,7 +125,7 @@ async function totpLogin(
 ): Promise<LoginResult> {
   for (let attempt = 1; attempt <= MAX_TOTP_ATTEMPTS; attempt++) {
     // eslint-disable-next-line no-await-in-loop
-    const code = await prompts.input('Code 2FA')
+    const code = await prompts.input('2FA code')
 
     try {
       // eslint-disable-next-line no-await-in-loop
@@ -134,7 +134,7 @@ async function totpLogin(
       return {email, password, token: session.token}
     } catch (error) {
       if (includesError(error, SERVER_ERROR.invalidTotp)) {
-        log(`Code 2FA invalide. (tentative ${attempt}/${MAX_TOTP_ATTEMPTS})`)
+        log(`Invalid 2FA code. (attempt ${attempt}/${MAX_TOTP_ATTEMPTS})`)
          
         continue
       }
@@ -143,7 +143,7 @@ async function totpLogin(
     }
   }
 
-  throw new AuthError('Code 2FA invalide après plusieurs tentatives.')
+  throw new AuthError('Invalid 2FA code after several attempts.')
 }
 
 /**
@@ -171,7 +171,7 @@ export async function ensureLoggedIn(options: EnsureLoggedInOptions): Promise<Lo
 
   if (!interactive) {
     throw new AuthError(
-      'Aucune session valide. Définis FOREST_TOKEN, ou lance `forest-onboard login` (mode interactif).',
+      'No valid session. Set FOREST_TOKEN, or run `forest-onboard login` (interactive mode).',
     )
   }
 

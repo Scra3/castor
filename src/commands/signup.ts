@@ -10,7 +10,7 @@ import {PASSWORD_HINT, isValidPassword} from '../services/signup.js'
 const MAX_PASSWORD_ATTEMPTS = 3
 
 export default class Signup extends Command {
-  static description = 'Créer un nouveau compte Forest Admin (email/mot de passe, ou --oauth pour Google/SSO).'
+  static description = 'Create a new Forest Admin account (email/password, or --oauth for Google/SSO).'
 
   static flags = {
     insecure: commonFlags.insecure,
@@ -36,14 +36,14 @@ export default class Signup extends Command {
         prompts: realPrompts,
         serverUrl,
       })
-      this.log(`✓ Compte prêt et connecté sur ${serverUrl} (OAuth).`)
+      this.log(`✓ Account ready and connected on ${serverUrl} (OAuth).`)
 
       return
     }
 
     const email = await input({message: 'Email'})
-    const firstName = await input({message: 'Prénom'})
-    const lastName = await input({message: 'Nom'})
+    const firstName = await input({message: 'First name'})
+    const lastName = await input({message: 'Last name'})
     const password = await this.promptPassword()
 
     try {
@@ -56,8 +56,8 @@ export default class Signup extends Command {
       throw error
     }
 
-    this.log(`✓ Compte créé pour ${email} sur ${serverUrl}.`)
-    this.log('Connecte-toi avec : forest-onboard login')
+    this.log(`✓ Account created for ${email} on ${serverUrl}.`)
+    this.log('Log in with: forest-onboard login')
   }
 
   /** Prompt for a policy-compliant password, then confirm it. */
@@ -66,21 +66,21 @@ export default class Signup extends Command {
 
     for (let attempt = 1; attempt <= MAX_PASSWORD_ATTEMPTS; attempt++) {
       // eslint-disable-next-line no-await-in-loop
-      const password = await passwordPrompt({mask: true, message: 'Mot de passe'})
+      const password = await passwordPrompt({mask: true, message: 'Password'})
 
       if (!isValidPassword(password)) {
-        this.log(`Mot de passe trop faible. ${PASSWORD_HINT}`)
-         
+        this.log(`Password too weak. ${PASSWORD_HINT}`)
+
         continue
       }
 
       // eslint-disable-next-line no-await-in-loop
-      const confirmation = await passwordPrompt({mask: true, message: 'Confirme le mot de passe'})
+      const confirmation = await passwordPrompt({mask: true, message: 'Confirm the password'})
       if (password === confirmation) return password
 
-      this.log('Les mots de passe ne correspondent pas.')
+      this.log('The passwords do not match.')
     }
 
-    this.error('Impossible de définir le mot de passe après plusieurs tentatives.')
+    this.error('Unable to set the password after several attempts.')
   }
 }

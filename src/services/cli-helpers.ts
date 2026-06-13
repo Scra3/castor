@@ -30,7 +30,7 @@ export const commonFlags = {
   }),
   oauth: Flags.boolean({
     default: false,
-    description: 'Se connecter via OAuth/OIDC dans le navigateur (Google/SSO, création de compte)',
+    description: 'Log in via OAuth/OIDC in the browser (Google/SSO, account creation)',
   }),
   server: Flags.string({
     description: 'Forest API server URL (default: $FOREST_URL, $FOREST_SERVER_URL, or production)',
@@ -45,7 +45,7 @@ export const commonFlags = {
 export function applyInsecure(insecure: boolean, warn: (message: string) => void): void {
   if (insecure) {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-    warn('Vérification TLS désactivée (--insecure). À n’utiliser que contre un serveur de dev de confiance.')
+    warn('TLS verification disabled (--insecure). Use only against a trusted dev server.')
   }
 }
 

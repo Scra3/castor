@@ -4,10 +4,10 @@
     "forest-onboard": "./bin/run.js"
   },
   "dependencies": {
+    "@forestadmin/agent-client": "^1.6.3",
     "@inquirer/prompts": "^7",
     "@oclif/core": "^3",
     "@oclif/plugin-help": "^6",
-    "@oclif/plugin-plugins": "^4",
     "yaml": "^2.9.0"
   },
   "description": "Forest Admin onboarding CLI: login, project creation, agent-nodejs scaffolding and start/verify",
@@ -45,9 +45,19 @@
     "dirname": "forest-onboard",
     "commands": "./dist/commands",
     "plugins": [
-      "@oclif/plugin-help",
-      "@oclif/plugin-plugins"
+      "@oclif/plugin-help"
     ],
+    "topics": {
+      "agent": {
+        "description": "Query and drive a running agent: read, create, update and delete records, run smart actions and charts."
+      },
+      "layout": {
+        "description": "Edit the layout file: pull/diff/apply/patch (atomic per domain)."
+      },
+      "workflow": {
+        "description": "Drive the workflow engine orchestrator: start, resume and run the lifecycle of workflow executions (orchestrator engine only)."
+      }
+    },
     "topicSeparator": " "
   },
   "repository": "Projects/mynewcli",

@@ -28,13 +28,13 @@ export function validateDatabaseUrl(url: string): string {
   try {
     parsed = new URL(url)
   } catch {
-    throw new DatabaseError(`URL de base de données invalide : "${url}".`)
+    throw new DatabaseError(`Invalid database URL: "${url}".`)
   }
 
   const protocol = parsed.protocol.replace(':', '')
   if (protocol !== 'postgres' && protocol !== 'postgresql') {
     throw new DatabaseError(
-      `La v1 ne supporte que Postgres ; protocole reçu : "${protocol}". Fournis une URL postgres://...`,
+      `v1 only supports Postgres; received protocol: "${protocol}". Provide a postgres://... URL`,
     )
   }
 
@@ -127,7 +127,7 @@ export async function resolveDatabase(options: ResolveDatabaseOptions): Promise<
     if (info.code !== 0) throw new DatabaseError('docker-not-running')
   } catch {
     throw new DatabaseError(
-      'Docker indisponible. Démarre Docker, OU fournis une base existante avec --database-url postgres://...',
+      'Docker unavailable. Start Docker, OR provide an existing database with --database-url postgres://...',
     )
   }
 
@@ -136,10 +136,10 @@ export async function resolveDatabase(options: ResolveDatabaseOptions): Promise<
   await writeFile(join(dbDir, 'docker-compose.yml'), buildDockerComposeYml(SAMPLE_DB_PORT), 'utf8')
   await writeFile(join(dbDir, 'seed.sql'), buildSeedSql(), 'utf8')
 
-  log('Démarrage d’une base Postgres d’exemple via Docker…')
+  log('Starting a sample Postgres database via Docker…')
   const up = await run('docker', ['compose', 'up', '-d', '--wait'], {cwd: dbDir})
   if (up.code !== 0) {
-    throw new DatabaseError(`Échec du démarrage de la base Docker.\n${up.stderr || up.stdout}`)
+    throw new DatabaseError(`Failed to start the Docker database.\n${up.stderr || up.stdout}`)
   }
 
   return {

@@ -16,23 +16,23 @@ const op = (overrides: Partial<PlannedOp>): PlannedOp => ({
 
 describe('layout/plan-format.formatPlan', () => {
   it('renders an empty plan as a success message', () => {
-    expect(formatPlan([], [])).to.contain('Aucun changement')
+    expect(formatPlan([], [])).to.contain('No changes')
   })
 
   it('groups ops by domain with op prefixes and a final count', () => {
     const plan = formatPlan(
       [
-        op({label: 'layout.collections[customers].displayName : « A » → « B »'}),
-        op({domain: 'folders', label: 'folders[u1].name : « X » → « Y »', path: '/folders/u1/name'}),
+        op({label: 'layout.collections[customers].displayName: « A » → « B »'}),
+        op({domain: 'folders', label: 'folders[u1].name: « X » → « Y »', path: '/folders/u1/name'}),
       ],
-      ['layout.collections[customers].modelName : ce champ ne peut pas être supprimé'],
+      ['layout.collections[customers].modelName: this field cannot be removed'],
     )
 
-    expect(plan).to.contain('layout (1 changement)')
-    expect(plan).to.contain('folders (1 changement)')
+    expect(plan).to.contain('layout (1 change)')
+    expect(plan).to.contain('folders (1 change)')
     expect(plan).to.contain('~ layout.collections')
     expect(plan).to.contain('⚠')
-    expect(plan).to.contain('2 opérations à envoyer (1 PATCH /api/layout, 1 PATCH /api/folders)')
+    expect(plan).to.contain('2 operations to send (1 PATCH /api/layout, 1 PATCH /api/folders)')
   })
 })
 
@@ -54,6 +54,6 @@ describe('layout/plan-format.explainApiError', () => {
 
   it('explains a 403 without premium ops as a permissions issue', () => {
     const message = explainApiError(new ForestApiError(403, 'Forbidden'), [op({})])
-    expect(message).to.contain('rôle')
+    expect(message).to.contain('role')
   })
 })

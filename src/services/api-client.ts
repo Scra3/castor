@@ -127,7 +127,7 @@ export class ForestApiClient {
 
     const token = doc.data.attributes?.token
     if (typeof token !== 'string') {
-      throw new ForestApiError(0, 'Réponse application-token inattendue : aucun token.')
+      throw new ForestApiError(0, 'Unexpected application-token response: no token.')
     }
 
     return token
@@ -164,6 +164,15 @@ export class ForestApiClient {
     )
 
     return response.secretKey
+  }
+
+  /** GET /api/environments/:id — read the workflow engine ('browser' | 'orchestrator'). */
+  async getEnvironmentWorkflowEngine(environmentId: number | string): Promise<string | undefined> {
+    const doc = await this.request<JsonApiDocument>('GET', `/api/environments/${environmentId}`, {auth: true})
+    const attributes = doc.data.attributes ?? {}
+    const engine = attributes.workflow_engine ?? attributes.workflowEngine
+
+    return typeof engine === 'string' ? engine : undefined
   }
 
   /**
@@ -281,6 +290,24 @@ export class ForestApiClient {
     })
 
     return doc.data.id
+  }
+
+  /**
+   * Call the workflow engine orchestrator (`/api/workflow-orchestrator/:subpath`).
+   * Authenticated as the current user, scoped by the `forest-rendering-id` header.
+   * Returns the parsed response body (the orchestrator wraps payloads in
+   * `{ status, response }` — unwrapping is the caller's concern).
+   */
+  workflowOrchestratorRequest<T>(
+    method: string,
+    subpath: string,
+    context: {body?: unknown; renderingId: number},
+  ): Promise<T> {
+    return this.request<T>(method, `/api/workflow-orchestrator${subpath}`, {
+      auth: true,
+      body: context.body,
+      headers: {'forest-rendering-id': String(context.renderingId)},
+    })
   }
 
   private async request<T>(

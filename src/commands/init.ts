@@ -29,14 +29,14 @@ function slugify(name: string): string {
 }
 
 export default class Init extends Command {
-  static description = 'Onboarding complet : login, création du projet, génération de l’agent, démarrage et vérification.'
+  static description = 'Complete onboarding: login, project creation, agent generation, start and verification.'
 
   static flags = {
     ...commonFlags,
-    'database-url': Flags.string({description: 'Connection string Postgres existante (sinon une base Docker est créée)'}),
-    name: Flags.string({char: 'n', description: 'Nom du projet Forest (défaut : nom du dossier courant)'}),
-    port: Flags.integer({default: DEFAULT_AGENT_PORT, description: 'Port d’écoute de l’agent'}),
-    yes: Flags.boolean({char: 'y', default: false, description: 'Mode non-interactif (CI) : aucun prompt'}),
+    'database-url': Flags.string({description: 'Existing Postgres connection string (otherwise a Docker database is created)'}),
+    name: Flags.string({char: 'n', description: 'Forest project name (default: current directory name)'}),
+    port: Flags.integer({default: DEFAULT_AGENT_PORT, description: 'Port the agent listens on'}),
+    yes: Flags.boolean({char: 'y', default: false, description: 'Non-interactive mode (CI): no prompts'}),
   }
 
   async run(): Promise<void> {
@@ -48,7 +48,7 @@ export default class Init extends Command {
 
     try {
       // [1/5] Authentication
-      this.log('[1/5] Authentification')
+      this.log('[1/5] Authentication')
       const session = await ensureLoggedIn({
         client,
         interactive,
@@ -59,7 +59,7 @@ export default class Init extends Command {
       })
 
       // [2/5] Project creation
-      this.log('[2/5] Création du projet')
+      this.log('[2/5] Creating the project')
       const forestName = await this.resolveProjectName(flags.name, interactive)
       const created = await this.createProjectWithRetry(client, forestName, interactive)
       const slug = slugify(forestName)
@@ -67,7 +67,7 @@ export default class Init extends Command {
       await this.assertDirIsFree(targetDir)
 
       // [3/5] Database
-      this.log('[3/5] Base de données')
+      this.log('[3/5] Database')
       const database = await resolveDatabase({
         databaseUrl: flags['database-url'],
         log: m => this.log(`  ${m}`),
@@ -75,7 +75,7 @@ export default class Init extends Command {
       })
 
       // [4/5] Scaffold + install + declare endpoint
-      this.log('[4/5] Génération du projet et installation')
+      this.log('[4/5] Generating the project and installing')
       const authSecret = randomBytes(32).toString('hex')
       const {port} = flags
       await writeAgentProject(targetDir, {
@@ -89,13 +89,13 @@ export default class Init extends Command {
 
       const install = await installAgentDependencies({dir: targetDir, logFile: join(targetDir, 'install.log')})
       if (install.code !== 0) {
-        this.error(`npm install a échoué (voir ${join(slug, 'install.log')}).`)
+        this.error(`npm install failed (see ${join(slug, 'install.log')}).`)
       }
 
       await client.setEnvironmentApiEndpoint(created.environmentId, `http://localhost:${port}`)
 
       // [5/5] Start + verify
-      this.log('[5/5] Démarrage de l’agent et vérification')
+      this.log('[5/5] Starting the agent and verifying')
       const agent = startAgent({dir: targetDir, logFile: join(targetDir, 'agent.log')})
 
       const active = await waitUntilActive(() => client.getEnvironmentIsActive(created.environmentId))
@@ -104,11 +104,11 @@ export default class Init extends Command {
         const output = agent.getOutput()
         await agent.stop()
         if (hasAddressInUse(output)) {
-          this.error(`Le port ${port} est déjà utilisé. Relance avec --port ${port + 1}.`)
+          this.error(`Port ${port} is already in use. Retry with --port ${port + 1}.`)
         }
 
         this.log(lastLines(output, 30))
-        this.error(`L’agent n’a pas rejoint le serveur ${serverUrl} sous 90 s. Vérifie qu’il tourne et qu’il y a accès.`)
+        this.error(`The agent did not reach the server ${serverUrl} within 90s. Check that it is running and reachable.`)
       }
 
       await this.reportSuccess({
@@ -129,7 +129,7 @@ export default class Init extends Command {
     try {
       const entries = await readdir(targetDir)
       if (entries.length > 0) {
-        this.error(`Le dossier ${targetDir} existe déjà et n’est pas vide. Supprime-le ou choisis un autre nom.`)
+        this.error(`The directory ${targetDir} already exists and is not empty. Delete it or choose another name.`)
       }
     } catch {
       // Directory does not exist yet — good.
@@ -150,15 +150,15 @@ export default class Init extends Command {
       if (!created.alreadyActive) return created
 
       if (!interactive) {
-        this.error(`Un projet « ${name} » existe déjà et est actif. Choisis un autre nom avec --name.`)
+        this.error(`A project named "${name}" already exists and is active. Choose another name with --name.`)
       }
 
-      this.log(`Le projet « ${name} » existe déjà. Choisis un autre nom.`)
+      this.log(`The project "${name}" already exists. Choose another name.`)
       // eslint-disable-next-line no-await-in-loop
-      name = await input({default: `${name}-2`, message: 'Nouveau nom du projet'})
+      name = await input({default: `${name}-2`, message: 'New project name'})
     }
 
-    this.error('Impossible de créer le projet : nom déjà utilisé après plusieurs tentatives.')
+    this.error('Unable to create the project: name already taken after several attempts.')
   }
 
   /** Map known domain errors to a clean CLI exit; rethrow unexpected ones. */
@@ -188,17 +188,17 @@ export default class Init extends Command {
     const loginUrl = `${app.url}/authentication/login`
 
     this.log('')
-    this.log(`✓ Projet « ${options.projectName} » opérationnel !`)
-    this.log(`  Code     : ./${options.slug}`)
-    this.log(`  Relancer : cd ${options.slug} && npm start`)
+    this.log(`✓ Project "${options.projectName}" is up and running!`)
+    this.log(`  Code    : ./${options.slug}`)
+    this.log(`  Restart : cd ${options.slug} && npm start`)
     this.log('')
 
     // Credentials box to copy/paste on the login page.
-    this.log('Identifiants pour te connecter :')
-    if (options.email) this.log(`  Email        : ${options.email}`)
-    if (options.password) this.log(`  Mot de passe : ${options.password}`)
-    if (!options.email) this.log('  (ta session existante — pas de mot de passe à saisir)')
-    this.log(`  Login        : ${loginUrl}`)
+    this.log('Credentials to sign in:')
+    if (options.email) this.log(`  Email    : ${options.email}`)
+    if (options.password) this.log(`  Password : ${options.password}`)
+    if (!options.email) this.log('  (your existing session — no password to enter)')
+    this.log(`  Login    : ${loginUrl}`)
 
     // Open the login page so the user can paste the credentials.
     openUrl(loginUrl)
@@ -206,7 +206,7 @@ export default class Init extends Command {
     // Keep the agent running so the data is live in the app.
     if (options.interactive) {
       this.log('')
-      this.log('Agent en cours d’exécution (données live dans l’app). Ctrl-C pour arrêter.')
+      this.log('Agent running (live data in the app). Press Ctrl-C to stop.')
       await new Promise<void>(resolveWait => {
         process.once('SIGINT', () => resolveWait())
       })
@@ -219,9 +219,9 @@ export default class Init extends Command {
     if (flagName) return flagName
 
     if (!interactive) {
-      this.error('Le nom du projet est requis en mode --yes : ajoute --name <nom>.')
+      this.error('The project name is required in --yes mode: add --name <name>.')
     }
 
-    return input({default: basename(process.cwd()), message: 'Nom du projet Forest'})
+    return input({default: basename(process.cwd()), message: 'Forest project name'})
   }
 }

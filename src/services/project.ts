@@ -32,7 +32,7 @@ export function findDefaultEnvironmentId(doc: JsonApiDocument): string {
   const included = doc.included?.find(resource => resource.type === 'environments')
   if (included?.id) return included.id
 
-  throw new ProjectError('Réponse inattendue du serveur : aucun environnement par défaut sur le projet.')
+  throw new ProjectError('Unexpected server response: no default environment on the project.')
 }
 
 function findIncludedEnvironment(doc: JsonApiDocument, environmentId: string): JsonApiResource | undefined {

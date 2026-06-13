@@ -273,7 +273,7 @@ describe('layout/diff — validation errors', () => {
     const local = clone(remote) as unknown[]
     ;(local[0] as {children: unknown[]}).children.push({isVisible: true, position: 5})
 
-    expect(() => diffDomain('folders', remote, local)).to.throw(LayoutFileError, /identifier/)
+    expect(() => diffDomain('folders', remote, local)).to.throw(LayoutFileError, /identify/)
   })
 
   it('rejects duplicated identities', async () => {
@@ -281,6 +281,6 @@ describe('layout/diff — validation errors', () => {
     const local = clone(remote) as Array<{children: Array<{id: string}>}>
     local[0].children.push({...local[0].children[0]})
 
-    expect(() => diffDomain('folders', remote, local)).to.throw(LayoutFileError, /même identité/)
+    expect(() => diffDomain('folders', remote, local)).to.throw(LayoutFileError, /same identity/)
   })
 })
