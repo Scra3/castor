@@ -155,6 +155,10 @@ node ./bin/run.js workflow abort <runId>
 Subcommands: `list, start, resume, continue, revise, abort, handle-manually, escalate,
 trigger` + `setup-executor` (below).
 
+**BEFORE scripting workflow runs, read `docs/WORKFLOWS.md`** — the full runtime model
+(state machine, the `loading` poll-trap, the drive loop, `trigger` payloads per step
+type, error cheat-sheet), learned by driving real runs.
+
 ### Assembling state + data, and driving a run (verified end-to-end)
 - **`resume` merges two sources**: the orchestrator returns run STATE
   (`workflowHistory`, `runState`, step definitions) and the executor stores the per-step
