@@ -53,37 +53,42 @@ trigger-driven step leaves the run in `started`/`pending`, so you keep control.
 
 ---
 
-## 3. The drive loop that works
+## 3. The drive loop (any workflow, any number/order of steps)
 
-```sh
-S="--project P --env E --team T --yes"                 # orchestrator scope
-SE="$S --project-dir ./agent-dir --executor-port 3400" # + executor access (reads FOREST_AUTH_SECRET)
+A workflow is an arbitrary graph of steps (read, condition, update, action, mcp,
+escalation, sub-workflow, end…). You don't hardcode a fixed sequence — you **loop**
+until `runState` is `finished`, reacting to whatever the current step needs:
 
-# 1. create the run (state: pending)
-RID=$(forest-onboard workflow start --workflow <uuid> --collection <col> --record <id> $S | grep '"id"' | head -1 | grep -oE '[0-9]+')
-
-# 2. run step 0 (e.g. read/get-data) — run becomes "started"
-forest-onboard workflow trigger $RID $SE
-
-# 3. advance to the next step (orchestrator) — dispatches it, run becomes "pending"
-forest-onboard workflow continue $RID $S
-
-# 4. an input/confirmation step runs its FIRST CALL (computes + saves pendingData,
-#    state "awaiting-input"). For update-record this happens once the step is dispatched.
-forest-onboard workflow trigger $RID $SE                       # first call (no data)
-
-# 5. CONFIRM with the input — this is the call that actually applies the step
-forest-onboard workflow trigger $RID $SE --data '{"userConfirmed":true,"value":"<new value>"}'
-
-# 6. advance until the End step → "finished"
-forest-onboard workflow continue $RID $S
+```
+start the run
+loop until runState == finished (or aborted):
+    state = resume(runId)                      # read-only snapshot (state + assembled data)
+    last  = state.workflowHistory[-1]
+    if last.done:                              # current step finished → move on
+        continue(runId)                        # orchestrator dispatches the next step
+    else if last needs input (awaiting-input): # an interactive step is waiting
+        trigger(runId)                         # 1st call: lets the executor compute + save pendingData
+        trigger(runId, pendingData=<patch for last.type>)   # 2nd call: confirm/supply input (§4)
+    else:                                      # an automated step is queued but not run yet
+        trigger(runId)                         # run it now (don't wait for the 30 s poll)
 ```
 
-> **Two triggers on an input step.** The first trigger is the step's *first call*
-> (the executor computes the field/value and stores `pendingData`, returning
-> `awaiting-input`); a confirm payload sent on that first call is **ignored**. The
-> **second** trigger, with `{userConfirmed:true, …}`, is what executes it. Sending
-> only one data-trigger silently leaves the record unchanged.
+Key invariants (independent of the workflow's shape):
+- **`trigger` runs the current step on the executor; `continue` advances to the next
+  step on the orchestrator.** Alternate between them as steps complete.
+- **An interactive step needs TWO triggers**: the *first call* makes the executor
+  compute and store `pendingData` (→ `awaiting-input`); a confirm payload sent on that
+  first call is **ignored**. The **second** trigger, with the patch for that step type
+  (§4), is what actually executes it. One data-trigger alone silently does nothing.
+- **Fully-automated steps** take a single `trigger` (no input) and then `continue`.
+- Keep driving with `trigger` faster than the poll interval to avoid the `loading`
+  trap (§2); `resume` between calls is free and tells you exactly what to do next.
+
+> Our test workflow happened to be read → update → read → end, so its concrete script
+> was `start · trigger · continue · trigger · trigger(confirm) · continue`. A
+> condition-then-action workflow would instead be `start · trigger · continue ·
+> trigger(confirm `{selectedOption}`) · continue · trigger(confirm `{userConfirmed}`) …`
+> — same loop, different per-step patches.
 
 ---
 
