@@ -1,11 +1,12 @@
 # Driving Forest Admin workflows from the CLI
 
-How the **workflow engine orchestrator** actually behaves at runtime, learned by
-driving real runs end-to-end with the `workflow` topic. Read this before scripting
-workflow runs — the state machine has non-obvious traps.
+How the **workflow engine orchestrator** behaves at runtime, and how to drive a run
+with the `workflow` topic. Read this before scripting workflow runs — the state
+machine has non-obvious traps.
 
-Verified June 2026 against `forestadmin-server` (`packages/private-api/.../workflow-orchestrator`)
-and `@forestadmin/workflow-executor` (agent-nodejs), driving runs on a live agent.
+Source of truth: `forestadmin-server` (`packages/private-api/.../workflow-orchestrator`)
+and `@forestadmin/workflow-executor` (agent-nodejs). Snapshot June 2026 — on an
+unexpected status, re-check those sources.
 
 ---
 
@@ -84,11 +85,12 @@ Key invariants (independent of the workflow's shape):
 - Keep driving with `trigger` faster than the poll interval to avoid the `loading`
   trap (§2); `resume` between calls is free and tells you exactly what to do next.
 
-> Our test workflow happened to be read → update → read → end, so its concrete script
-> was `start · trigger · continue · trigger · trigger(confirm) · continue`. A
-> condition-then-action workflow would instead be `start · trigger · continue ·
-> trigger(confirm `{selectedOption}`) · continue · trigger(confirm `{userConfirmed}`) …`
-> — same loop, different per-step patches.
+Examples of the same loop on different step graphs:
+- read → update → end: `start · trigger · continue · trigger · trigger(confirm
+  `{userConfirmed,value}`) · continue`.
+- condition → action → end: `start · trigger · continue · trigger(confirm
+  `{selectedOption}`) · continue · trigger · trigger(confirm `{userConfirmed}`) ·
+  continue`.
 
 ---
 
@@ -97,7 +99,7 @@ Key invariants (independent of the workflow's shape):
 `POST /runs/:runId/trigger` body is `{ "pendingData": <patch> }`. The executor
 validates `<patch>` with a **strict** zod schema per step type
 (`workflow-executor/src/http/pending-data-validators.ts`) → wrong shape = `503
-"This step couldn't be completed"` / "Unrecognized key". Verified shapes:
+"This step couldn't be completed"` / "Unrecognized key":
 
 | step type | `pendingData` patch |
 |---|---|
@@ -123,7 +125,7 @@ orchestrator state only (best-effort: an unreachable executor just warns).
 
 ---
 
-## 6. HTTP error cheat-sheet (observed)
+## 6. HTTP error cheat-sheet
 
 - `409 active workflow run already exists … on record` → one active run per
   (workflow, record); `abort` the old one first.
