@@ -52,6 +52,9 @@
       "layout": {
         "description": "Edit the layout file: pull/diff/apply/patch (atomic per domain)."
       },
+      "public-api": {
+        "description": "Read Forest's public API: activity logs, notes and admin logs (read-only)."
+      },
       "workflow": {
         "description": "Drive the workflow engine orchestrator: start, resume and run the lifecycle of workflow executions (orchestrator engine only)."
       }

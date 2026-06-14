@@ -47,6 +47,10 @@ src/
       scaffolder.ts  #   buildExecutorProjectFiles / writeExecutorProject (.env, package.json)
       runner.ts      #   install/start + readiness ("Workflow executor ready") + fatal detection
       errors.ts      #   ExecutorError
+    public-api/      # read Forest's PUBLIC API (separate host, read-only, plain JSON)
+      client.ts      #   PublicApiClient.get<T>(path, query) → {data, hasMore, parameters}
+      command.ts     #   publicApiFlags + withPublicApi (login → scope → public client) + filters
+      errors.ts      #   PublicApiError (carries HTTP status)
     agent/           # drive the running agent via @forestadmin/agent-client
       token.ts       #   mint a HS256 JWT from the agent's FOREST_AUTH_SECRET (node:crypto)
       connection.ts  #   resolve agentUrl (root, no /forest) + authSecret (flag/env/.env)
@@ -218,6 +222,35 @@ response envelope `{status, response}` (we unwrap `.response`); `runId` is an in
 `POST /handle-manually/:runId` · `POST /escalate/:runId {inboxId}`. Run states:
 `loading|started|pending|aborted|finished`. The executor-facing endpoints
 (`pending-run`, `update-step`, …, auth `forest-secret-key`) are out of scope.
+
+## The public API (the `public-api` topic)
+
+`public-api <cmd>` reads Forest's **public API** — a SEPARATE host from the private API,
+**read-only**, plain JSON (NOT JSON:API), responses shaped `{hasMore, data[], parameters}`.
+
+```sh
+node ./bin/run.js public-api activity-logs --project "My Project" --env Production --limit 20
+node ./bin/run.js public-api notes --collection customers --record 42
+node ./bin/run.js public-api admin-logs --resource Team --type update --created-after 2026-06-01
+```
+
+Subcommands: `activity-logs`, `notes` (both `/v1/project/:name/environment/:name/…`), and
+`admin-logs` (`/v1/project/:name/…`, NO environment). `withPublicApi`
+(`services/public-api/command.ts`) does login → `resolveScope` (project/env **names**, not
+ids) → build `PublicApiClient`. Shared filters: `--limit` (1-100), `--user-email`,
+`--user-id`, `--created-after/before` (ISO, validated client-side → `createdAt.gte/lte`).
+
+GOTCHAS (verified live against prod):
+1. **Host**: `https://public-api.forestadmin.com`, prefix `/v1`. `resolvePublicApiUrl`
+   (`config.ts`) derives it from `--server` (host `api.*` → `public-api.*`); override with
+   `--public-api-url` / `$FOREST_PUBLIC_API_URL`. A local stack can't be derived.
+2. **Auth = `Authorization: Bearer`** and the **session JWT is accepted** (confirmed:
+   no token → 401, session token → past-auth). For unattended/long-lived use pass an
+   application token via `--api-token` / `$FOREST_API_TOKEN` (the session JWT expires ~24h).
+3. **Endpoints are plan-gated** → `402 PaymentRequiredError` with
+   `details.feature` (`activityLogsPublicAPI` / `notesPublicAPI` / `adminHistoryPublicAPI`)
+   when the feature isn't on the project's plan. `PublicApiError` maps 401/403/402/429
+   to actionable messages. The free test project returns 402 on all three (expected).
 
 ## Server API contracts (verified against the running server)
 

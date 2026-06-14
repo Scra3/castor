@@ -7,6 +7,9 @@
 
 export const DEFAULT_SERVER_URL = 'https://api.forestadmin.com'
 
+/** Forest's public API (audit/observability). A separate host from the private API. */
+export const DEFAULT_PUBLIC_API_URL = 'https://public-api.forestadmin.com'
+
 const PRODUCTION_APP_URL = 'https://app.forestadmin.com'
 const DEVELOPMENT_APP_URL = 'https://app.development.forestadmin.com'
 
@@ -30,6 +33,43 @@ export function resolveServerUrl(flagServer?: string, env: NodeJS.ProcessEnv = p
 /** True when the resolved server URL is the production default. */
 export function isDefaultServerUrl(serverUrl: string): boolean {
   return serverUrl === DEFAULT_SERVER_URL
+}
+
+/**
+ * Resolve the Forest public API base URL.
+ *
+ * Precedence (highest first):
+ *   1. the `--public-api-url` flag (passed as `flag`)
+ *   2. the `FOREST_PUBLIC_API_URL` environment variable
+ *   3. derived from the server URL when its host starts with `api.`
+ *      (e.g. `api.development.forestadmin.com` → `public-api.development.forestadmin.com`)
+ *   4. the production default
+ *
+ * A local stack (localhost) cannot be derived — pass `--public-api-url` explicitly.
+ * The trailing slash, if any, is stripped.
+ */
+export function resolvePublicApiUrl(
+  flag?: string,
+  serverUrl?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const explicit = flag || env.FOREST_PUBLIC_API_URL
+  if (explicit) return explicit.replace(/\/+$/, '')
+
+  if (serverUrl) {
+    try {
+      const url = new URL(serverUrl)
+      if (url.hostname.startsWith('api.')) {
+        url.hostname = `public-api.${url.hostname.slice('api.'.length)}`
+
+        return url.origin
+      }
+    } catch {
+      // not a parseable URL — fall through to the default
+    }
+  }
+
+  return DEFAULT_PUBLIC_API_URL
 }
 
 export type AppUrl = {

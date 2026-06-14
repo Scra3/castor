@@ -100,6 +100,25 @@ handle-manually, escalate, trigger` + `setup-executor`.
 The full runtime model (state machine, drive loop, per-step-type payloads) is documented
 in **`docs/WORKFLOWS.md`**.
 
+## 5. Public API — `public-api`
+
+Read Forest's **public API** (a separate, versioned, read-only REST API for audit and
+observability data). Project/environment are resolved by name from the scope flags.
+
+```sh
+node ./bin/run.js public-api activity-logs --project "My Project" --env Production --limit 20
+node ./bin/run.js public-api activity-logs --collection customers --action update
+node ./bin/run.js public-api notes --collection customers --record 42
+node ./bin/run.js public-api admin-logs --resource Team --type update --created-after 2026-06-01
+```
+
+Subcommands: `activity-logs`, `notes`, `admin-logs`. Shared filters: `--limit` (1-100),
+`--user-email`, `--user-id`, `--created-after/before` (ISO). Auth reuses your session
+token; pass a long-lived application token via `--api-token` / `$FOREST_API_TOKEN` for
+unattended use. The host is derived from `--server` (`api.*` → `public-api.*`) or set with
+`--public-api-url` / `$FOREST_PUBLIC_API_URL`. These endpoints are **plan-gated** — a `402`
+means the feature isn't enabled on your Forest plan.
+
 ## Conventions
 
 - ESM + `Node16` → relative imports carry the `.js` extension.
