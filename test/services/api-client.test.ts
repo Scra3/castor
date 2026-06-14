@@ -132,11 +132,11 @@ describe('ForestApiClient', () => {
     const {calls, impl} = fakeFetch(200, {data: {attributes: {token: 'app-secret'}, id: '1', type: 'application-token'}})
     const client = new ForestApiClient({fetch: impl, serverUrl, token: 'oidc-access'})
 
-    const token = await client.createApplicationToken('forest-onboard @host')
+    const token = await client.createApplicationToken('castor @host')
 
     expect(token).to.equal('app-secret')
     const sentBody = JSON.parse(calls[0].init?.body as string)
-    expect(sentBody.data).to.deep.equal({attributes: {name: 'forest-onboard @host'}, type: 'application-tokens'})
+    expect(sentBody.data).to.deep.equal({attributes: {name: 'castor @host'}, type: 'application-tokens'})
   })
 
   it('throws when the application-token response has no token', async () => {

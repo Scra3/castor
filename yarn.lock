@@ -3267,6 +3267,35 @@ __metadata:
   languageName: node
   linkType: hard
 
+"castor@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "castor@workspace:."
+  dependencies:
+    "@forestadmin/agent-client": "npm:^1.6.3"
+    "@inquirer/prompts": "npm:^7"
+    "@oclif/core": "npm:^3"
+    "@oclif/plugin-help": "npm:^6"
+    "@oclif/prettier-config": "npm:^0.2.1"
+    "@oclif/test": "npm:^3"
+    "@types/chai": "npm:^4"
+    "@types/mocha": "npm:^10"
+    "@types/node": "npm:^18"
+    chai: "npm:^4"
+    eslint: "npm:^8"
+    eslint-config-oclif: "npm:^5"
+    eslint-config-oclif-typescript: "npm:^3"
+    eslint-config-prettier: "npm:^9.1.0"
+    mocha: "npm:^10"
+    oclif: "npm:^4.3.6"
+    shx: "npm:^0.3.4"
+    ts-node: "npm:^10.9.2"
+    typescript: "npm:^5"
+    yaml: "npm:^2.9.0"
+  bin:
+    castor: ./bin/run.js
+  languageName: unknown
+  linkType: soft
+
 "chai@npm:^4, chai@npm:^4.4.1":
   version: 4.4.1
   resolution: "chai@npm:4.4.1"
@@ -6986,35 +7015,6 @@ __metadata:
   checksum: 10c0/2cf48a2087175c60c8dcdbc619908b49c07f7adcfc37d29236b0c5c612d6204f789104c98cc44d38acab7b3c96f4a3ec2cfdc4934d0738d876dbefa2a12c69f4
   languageName: node
   linkType: hard
-
-"mynewcli@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "mynewcli@workspace:."
-  dependencies:
-    "@forestadmin/agent-client": "npm:^1.6.3"
-    "@inquirer/prompts": "npm:^7"
-    "@oclif/core": "npm:^3"
-    "@oclif/plugin-help": "npm:^6"
-    "@oclif/prettier-config": "npm:^0.2.1"
-    "@oclif/test": "npm:^3"
-    "@types/chai": "npm:^4"
-    "@types/mocha": "npm:^10"
-    "@types/node": "npm:^18"
-    chai: "npm:^4"
-    eslint: "npm:^8"
-    eslint-config-oclif: "npm:^5"
-    eslint-config-oclif-typescript: "npm:^3"
-    eslint-config-prettier: "npm:^9.1.0"
-    mocha: "npm:^10"
-    oclif: "npm:^4.3.6"
-    shx: "npm:^0.3.4"
-    ts-node: "npm:^10.9.2"
-    typescript: "npm:^5"
-    yaml: "npm:^2.9.0"
-  bin:
-    forest-onboard: ./bin/run.js
-  languageName: unknown
-  linkType: soft
 
 "nanoid@npm:3.3.3":
   version: 3.3.3

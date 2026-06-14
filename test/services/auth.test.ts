@@ -48,7 +48,7 @@ describe('auth.ensureLoggedIn', () => {
   let path: string
 
   beforeEach(() => {
-    path = join(tmpdir(), `forest-onboard-auth-${Date.now()}-${Math.random().toString(36).slice(2)}.json`)
+    path = join(tmpdir(), `castor-auth-${Date.now()}-${Math.random().toString(36).slice(2)}.json`)
   })
 
   afterEach(async () => {
@@ -170,7 +170,7 @@ describe('auth.ensureLoggedIn', () => {
     } as unknown as Parameters<typeof ensureLoggedIn>[0]['client']
 
     const result = await ensureLoggedIn({
-      appTokenName: 'forest-onboard @ci',
+      appTokenName: 'castor @ci',
       client,
       credentialsPath: path,
       env: {},
@@ -181,10 +181,10 @@ describe('auth.ensureLoggedIn', () => {
       serverUrl,
     })
 
-    expect(result.token).to.equal('app-token-for-forest-onboard @ci')
+    expect(result.token).to.equal('app-token-for-castor @ci')
     // First the OIDC access token, then the exchanged application token.
-    expect(setTokens).to.deep.equal(['oidc-access-token', 'app-token-for-forest-onboard @ci'])
-    expect(await loadToken(serverUrl, path)).to.equal('app-token-for-forest-onboard @ci')
+    expect(setTokens).to.deep.equal(['oidc-access-token', 'app-token-for-castor @ci'])
+    expect(await loadToken(serverUrl, path)).to.equal('app-token-for-castor @ci')
   })
 
   it('surfaces an SSO-only account with a FOREST_TOKEN hint', async () => {

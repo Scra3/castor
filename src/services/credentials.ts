@@ -1,7 +1,7 @@
 /**
  * Persistence of the Forest Admin session token on disk.
  *
- * Stored at `~/.config/forest-onboard/credentials.json` with strict permissions
+ * Stored at `~/.config/castor/credentials.json` with strict permissions
  * (file 0600, directory 0700) since it holds a bearer token. The token is keyed
  * by server URL so credentials for prod and a local dev stack don't clobber each
  * other.
@@ -16,7 +16,7 @@ export type StoredCredentials = {
   tokens: Record<string, string>
 }
 
-const CONFIG_DIR = join(homedir(), '.config', 'forest-onboard')
+const CONFIG_DIR = join(homedir(), '.config', 'castor')
 const CREDENTIALS_PATH = join(CONFIG_DIR, 'credentials.json')
 
 /** Exposed for tests that need to assert on the on-disk location. */

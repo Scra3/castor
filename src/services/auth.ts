@@ -171,7 +171,7 @@ export async function ensureLoggedIn(options: EnsureLoggedInOptions): Promise<Lo
 
   if (!interactive) {
     throw new AuthError(
-      'No valid session. Set FOREST_TOKEN, or run `forest-onboard login` (interactive mode).',
+      'No valid session. Set FOREST_TOKEN, or run `castor login` (interactive mode).',
     )
   }
 
@@ -201,5 +201,5 @@ async function oauthExchange(
 
   client.setToken(accessToken)
 
-  return {token: await client.createApplicationToken(appTokenName ?? `forest-onboard @${hostname()}`)}
+  return {token: await client.createApplicationToken(appTokenName ?? `castor @${hostname()}`)}
 }

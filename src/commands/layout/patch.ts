@@ -13,7 +13,7 @@ export default class LayoutPatch extends Command {
   static description = 'Send raw JSON Patch (RFC 6902) operations to the layout — expert escape hatch.'
 
   static examples = [
-    `echo '[{"op":"replace","path":"/collections/customers/icon","value":"users"}]' | forest-onboard layout patch --yes`,
+    `echo '[{"op":"replace","path":"/collections/customers/icon","value":"users"}]' | castor layout patch --yes`,
   ]
 
   static flags = {

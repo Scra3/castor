@@ -14,7 +14,7 @@ describe('agent-runner.installAgentDependencies', () => {
   let logFile: string
 
   beforeEach(() => {
-    logFile = join(tmpdir(), `forest-onboard-install-${Date.now()}-${Math.random().toString(36).slice(2)}.log`)
+    logFile = join(tmpdir(), `castor-install-${Date.now()}-${Math.random().toString(36).slice(2)}.log`)
   })
 
   afterEach(async () => {

@@ -57,7 +57,7 @@ export default class Signup extends Command {
     }
 
     this.log(`✓ Account created for ${email} on ${serverUrl}.`)
-    this.log('Log in with: forest-onboard login')
+    this.log('Log in with: castor login')
   }
 
   /** Prompt for a policy-compliant password, then confirm it. */

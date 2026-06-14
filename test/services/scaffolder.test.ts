@@ -69,7 +69,7 @@ describe('scaffolder.writeAgentProject', () => {
   let dir: string
 
   beforeEach(() => {
-    dir = join(tmpdir(), `forest-onboard-scaffold-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    dir = join(tmpdir(), `castor-scaffold-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   })
 
   afterEach(async () => {

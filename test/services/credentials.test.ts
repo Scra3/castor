@@ -17,7 +17,7 @@ describe('credentials', () => {
   let path: string
 
   beforeEach(() => {
-    path = join(tmpdir(), `forest-onboard-creds-${Date.now()}-${Math.random().toString(36).slice(2)}.json`)
+    path = join(tmpdir(), `castor-creds-${Date.now()}-${Math.random().toString(36).slice(2)}.json`)
   })
 
   afterEach(async () => {

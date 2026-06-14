@@ -57,7 +57,7 @@ describe('database.resolveDatabase', () => {
   let dir: string
 
   beforeEach(() => {
-    dir = join(tmpdir(), `forest-onboard-db-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    dir = join(tmpdir(), `castor-db-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   })
 
   afterEach(async () => {

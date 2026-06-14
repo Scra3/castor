@@ -94,7 +94,7 @@ export async function loginWithOAuth(serverUrl: string, deps: OAuthDeps): Promis
   const registration = await postJson(fetchImpl, registrationEndpoint, {
     application_type: 'native',
     grant_types: [DEVICE_GRANT],
-    name: 'forest-onboard',
+    name: 'castor',
     redirect_uris: [REDIRECT_URI],
     response_types: ['none'],
     token_endpoint_auth_method: 'none',

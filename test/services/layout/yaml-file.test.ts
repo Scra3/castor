@@ -34,7 +34,7 @@ describe('layout/yaml-file', () => {
 
   it('writes the guidance header comment', () => {
     const content = serializeLayoutFile(scope, docs, () => new Date())
-    expect(content).to.contain('forest-onboard layout pull')
+    expect(content).to.contain('castor layout pull')
     expect(content).to.contain('DO NOT modify them')
   })
 
@@ -48,7 +48,7 @@ describe('layout/yaml-file', () => {
   })
 
   it('rejects a file without the forest header', () => {
-    expect(() => parseLayoutFile('layout: {}')).to.throw(LayoutFileError, /forest-onboard layout pull/)
+    expect(() => parseLayoutFile('layout: {}')).to.throw(LayoutFileError, /castor layout pull/)
   })
 
   it('rejects invalid YAML with a clear error', () => {

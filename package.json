@@ -1,8 +1,6 @@
 {
   "author": "",
-  "bin": {
-    "forest-onboard": "./bin/run.js"
-  },
+  "bin": "./bin/run.js",
   "dependencies": {
     "@forestadmin/agent-client": "^1.6.3",
     "@inquirer/prompts": "^7",
@@ -10,7 +8,7 @@
     "@oclif/plugin-help": "^6",
     "yaml": "^2.9.0"
   },
-  "description": "Forest Admin onboarding CLI: login, project creation, agent-nodejs scaffolding and start/verify",
+  "description": "castor — construis ton Forest avec ton compagnon castor 🦫",
   "devDependencies": {
     "@oclif/prettier-config": "^0.2.1",
     "@oclif/test": "^3",
@@ -36,13 +34,13 @@
     "/dist",
     "/oclif.manifest.json"
   ],
-  "homepage": "https://github.com/Projects/mynewcli",
+  "homepage": "https://github.com/Scra3/castor",
   "license": "MIT",
   "main": "",
-  "name": "mynewcli",
+  "name": "castor",
   "oclif": {
-    "bin": "forest-onboard",
-    "dirname": "forest-onboard",
+    "bin": "castor",
+    "dirname": "castor",
     "commands": "./dist/commands",
     "plugins": [
       "@oclif/plugin-help"
@@ -60,7 +58,7 @@
     },
     "topicSeparator": " "
   },
-  "repository": "Projects/mynewcli",
+  "repository": "Scra3/castor",
   "scripts": {
     "build": "shx rm -rf dist && tsc -b",
     "lint": "eslint . --ext .ts",
@@ -72,9 +70,11 @@
     "version": "oclif readme && git add README.md"
   },
   "version": "0.0.0",
-  "bugs": "https://github.com/Projects/mynewcli/issues",
+  "bugs": "https://github.com/Scra3/castor/issues",
   "keywords": [
-    "oclif"
+    "oclif",
+    "castor",
+    "forest-admin"
   ],
   "types": "dist/index.d.ts",
   "exports": "./lib/index.js",

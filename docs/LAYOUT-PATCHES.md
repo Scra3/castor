@@ -5,8 +5,8 @@ Référence des opérations **JSON Patch (RFC 6902)** acceptées par les endpoin
 
 > **Usage avec la CLI** :
 > ```sh
-> echo '[{"op":"replace","path":"...","value":...}]' | forest-onboard layout patch --domain layout --yes
-> # ou : forest-onboard layout patch --file ops.json --domain folders
+> echo '[{"op":"replace","path":"...","value":...}]' | castor layout patch --domain layout --yes
+> # ou : castor layout patch --file ops.json --domain folders
 > ```
 > Ce document est extrait du code serveur (`make-layout-patch-patterns.ts` + validateurs Joi,
 > juin 2026) et **vérifié exhaustif par extraction automatique : 248 patterns**

@@ -59,7 +59,7 @@ export default class LayoutPull extends Command {
       ].filter(Boolean)
 
       this.log(`✓ Layout pulled → ${flags.file} (${counts.join(', ')})`)
-      this.log('Edit the file then run `forest-onboard layout diff` to see the plan.')
+      this.log('Edit the file then run `castor layout diff` to see the plan.')
     } catch (error) {
       if (error instanceof ScopeError || error instanceof TypeError) this.error(error.message)
       throw error

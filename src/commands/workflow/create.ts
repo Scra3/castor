@@ -34,7 +34,7 @@ export default class WorkflowCreate extends Command {
       printJson(this, result)
       this.log('')
       this.log('Run it with:')
-      this.log(`  forest-onboard workflow run --workflow ${result.id} --collection ${result.collectionId} --record <id> --project-dir <agent-dir>`)
+      this.log(`  castor workflow run --workflow ${result.id} --collection ${result.collectionId} --record <id> --project-dir <agent-dir>`)
     })
   }
 }

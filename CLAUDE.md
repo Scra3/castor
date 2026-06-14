@@ -1,12 +1,12 @@
-# CLAUDE.md — forest-onboard
+# CLAUDE.md — castor
 
 Guidance for Claude working on this repo. Read this before editing or running the CLI.
 
 ## What this is
 
-`forest-onboard` is a CLI (oclif, ESM, TypeScript) that performs a **complete Forest Admin
+`castor` is a CLI (oclif, ESM, TypeScript) that performs a **complete Forest Admin
 onboarding end-to-end**: authentication → project creation → `agent-nodejs` scaffolding →
-agent start → verification that the environment is live. Built from the `mynewcli` oclif
+agent start → verification that the environment is live. Built from the `castor` oclif
 skeleton.
 
 ## Commands (dev)
@@ -55,7 +55,7 @@ src/
       command.ts     #   agentFlags + withAgent() orchestration + JSON/query helpers
       errors.ts      #   AgentError
     config.ts        # resolveServerUrl / resolveAppUrl (prod vs dev vs custom)
-    credentials.ts   # token persistence (~/.config/forest-onboard/credentials.json, 0600) + JWT exp
+    credentials.ts   # token persistence (~/.config/castor/credentials.json, 0600) + JWT exp
     api-client.ts    # ForestApiClient + ForestApiError (native fetch, injectable for tests)
     auth.ts          # ensureLoggedIn: FOREST_TOKEN > stored token > interactive (email/pass+2FA, or OAuth)
     oauth.ts         # OIDC device flow (RFC 8628), raw fetch — Google/SSO login + signup
@@ -303,7 +303,7 @@ All JSON.
 ## Auth & credentials
 
 - Token precedence: `FOREST_TOKEN` env > stored file (checked for JWT expiry) > interactive.
-- Stored at `~/.config/forest-onboard/credentials.json` (file 0600, dir 0700), keyed by
+- Stored at `~/.config/castor/credentials.json` (file 0600, dir 0700), keyed by
   server URL so prod and dev tokens don't collide.
 - `--verbose` logs HTTP with secrets redacted; `--insecure` (explicit) disables TLS verify
   for local https dev only.
