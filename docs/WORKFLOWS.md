@@ -2,7 +2,7 @@
 
 How the **workflow engine orchestrator** behaves at runtime, and how to drive a run
 with the `workflow` topic. Read this before scripting workflow runs — the state
-machine has non-obvious traps.
+machine has a few non-obvious rules.
 
 Source of truth: `forestadmin-server` (`packages/private-api/.../workflow-orchestrator`)
 and `@forestadmin/workflow-executor` (agent-nodejs). Snapshot June 2026 — on an
@@ -34,7 +34,7 @@ After a step finishes, the orchestrator sets the next state from the step's
 
 | step executionType | driven by **trigger** | claimed by the **30 s poll** |
 |---|---|---|
-| `fully-automated` / `automated-with-confirmation` | → **`pending`** (re-triggerable) | → **`loading`** ⚠️ |
+| `fully-automated` / `automated-with-confirmation` | → **`pending`** (re-triggerable) | → **`loading`** (executor-owned) |
 | manual (no auto) | → `started` | → `started` |
 
 - **`trigger` (executor) accepts only `started` / `pending`** → a `loading` run is
@@ -44,13 +44,18 @@ After a step finishes, the orchestrator sets the next state from the step's
 - **`resume` is read-only** (hydrates state, re-assigns the run to you, logs) — safe
   to call any time; it does NOT change the run state.
 
-### ⚠️ The "loading" trap
-If the executor's background poll (every `POLLING_INTERVAL_S`, default 30 s) **claims**
-the run and runs an automatic step, the run lands in **`loading`** — which is neither
-triggerable nor continuable, and you're stuck until the lock expires.
-**→ Drive runs yourself with `trigger`, faster than the poll interval.** A
-trigger-driven step leaves the run in `started`/`pending`, so you keep control.
-(`workflow abort <runId>` to recover a wedged run.)
+### `loading` = the executor owns the run (poll contention)
+`loading` is the run's initial state at `start`, and the state an automatic step lands
+in when the run was **claimed by the executor's background poll** (every
+`POLLING_INTERVAL_S`, default 30 s): the run is locked (`lockedAt` set) and the executor
+is the party expected to advance it. It is not an error — the executor processes
+`loading` runs itself, and orphaned locks expire (`releaseExpiredLockedRuns`).
+
+It only matters when **you** drive a run by hand: `trigger`/`continue` act on
+`started`/`pending`, not `loading`, so if the poll claims the run mid-drive your manual
+loop and the executor contend for it. To stay in control, drive with `trigger` faster
+than the poll interval (a trigger-driven step leaves the run `started`/`pending`); if a
+run is wedged in `loading`, wait for the lock to expire or `workflow abort <runId>`.
 
 ---
 
@@ -82,8 +87,7 @@ Key invariants (independent of the workflow's shape):
   first call is **ignored**. The **second** trigger, with the patch for that step type
   (§4), is what actually executes it. One data-trigger alone silently does nothing.
 - **Fully-automated steps** take a single `trigger` (no input) and then `continue`.
-- Keep driving with `trigger` faster than the poll interval to avoid the `loading`
-  trap (§2); `resume` between calls is free and tells you exactly what to do next.
+- Keep driving with `trigger` faster than the poll interval to avoid contending with the poll over a `loading` run (§2); `resume` between calls is free and tells you exactly what to do next.
 
 Examples of the same loop on different step graphs:
 - read → update → end: `start · trigger · continue · trigger · trigger(confirm
@@ -130,7 +134,7 @@ orchestrator state only (best-effort: an unreachable executor just warns).
 - `409 active workflow run already exists … on record` → one active run per
   (workflow, record); `abort` the old one first.
 - `409 not in loading or started state` → `continue` on a non-`started` run (it was
-  poll-claimed into `loading`, or is `pending`). Drive via `trigger`, or `abort`.
+  claimed by the poll into `loading`, or is `pending`). Drive via `trigger`, or `abort`.
 - `404 Run not found or unavailable` → `trigger` on a `loading`/`finished`/`aborted`
   run (executor only serves `started`/`pending`).
 - `503 This step couldn't be completed` → wrong `pendingData` shape (see §4), or the
