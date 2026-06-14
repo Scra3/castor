@@ -146,6 +146,23 @@ export class ForestApiClient {
     })
   }
 
+  /**
+   * POST /api/workflows/:id/generate-presigned-request?collectionId=… — get an S3
+   * presigned POST for uploading the workflow's BPMN. Scoped by `forest-rendering-id`.
+   */
+  generateWorkflowPresignedRequest(
+    workflowId: string,
+    collectionId: string,
+    renderingId: number,
+    meta: {name?: string; size?: number; type?: string} = {},
+  ): Promise<{fields: Record<string, string>; url: string}> {
+    return this.request<{fields: Record<string, string>; url: string}>(
+      'POST',
+      `/api/workflows/${workflowId}/generate-presigned-request?collectionId=${encodeURIComponent(collectionId)}`,
+      {auth: true, body: meta, headers: {'forest-rendering-id': String(renderingId)}},
+    )
+  }
+
   /** GET /api/environments/:id — read the `is_active` onboarding flag. */
   async getEnvironmentIsActive(environmentId: string): Promise<boolean> {
     const doc = await this.request<JsonApiDocument>('GET', `/api/environments/${environmentId}`, {auth: true})

@@ -146,14 +146,18 @@ header. So it reuses `ensureLoggedIn` + `resolveScope` + `getRendering` (for the
 renderingId) — NOT agent-client.
 
 ```sh
+node ./bin/run.js workflow create -f workflow.yml --project "My Project"  # author from YAML → BPMN
 node ./bin/run.js workflow list --project "My Project"          # workflow definitions → ids
-node ./bin/run.js workflow start --workflow <uuid> --collection customers --record 1
+node ./bin/run.js workflow run --workflow <uuid> --collection customers --record 1 --project-dir ./<slug>  # autopilot
+node ./bin/run.js workflow start --workflow <uuid> --collection customers --record 1  # manual driving
 node ./bin/run.js workflow resume <runId>
 node ./bin/run.js workflow abort <runId>
 ```
 
-Subcommands: `list, start, resume, continue, revise, abort, handle-manually, escalate,
-trigger` + `setup-executor` (below).
+Subcommands: `create, run, list, start, resume, continue, revise, abort,
+handle-manually, escalate, trigger` + `setup-executor` (below). `create` (YAML spec →
+BPMN, §5 bis of docs/WORKFLOWS.md) and `run` (autopilot driving the whole loop) are
+orchestrator-only.
 
 **BEFORE scripting workflow runs, read `docs/WORKFLOWS.md`** — the full runtime model
 (state machine, the `loading` poll-trap, the drive loop, `trigger` payloads per step

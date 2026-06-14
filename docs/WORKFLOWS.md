@@ -129,6 +129,38 @@ orchestrator state only (best-effort: an unreachable executor just warns).
 
 ---
 
+## 5 bis. Creating a workflow (`workflow create`)
+
+`workflow create -f spec.yml` authors a workflow from a YAML spec, compiles it to BPMN,
+and deploys it (orchestrator engine only). Three server calls (verified):
+1. `patchLayoutDomain('workflows', [add /workflows/-], {environmentId, teamId})` — shell
+   `{id(uuid), name, collectionId, segmentIds, isVisible, position}` (name unique per collection).
+2. `POST /api/workflows/:id/generate-presigned-request?collectionId=<col>` (header
+   `forest-rendering-id`) → `{url, fields}`; **multipart POST** the BPMN to S3 — the
+   upload's `x-amz-version-id` is the `bpmnAwsS3Identifier`.
+3. `patchLayoutDomain('workflows', [replace /workflows/:id/bpmnAwsS3Identifier])`.
+
+YAML spec = a step graph (`src/services/workflow/bpmn.ts` compiles it):
+```yaml
+name: Update email
+collection: customers
+start: read              # optional, defaults to first step
+steps:
+  - {id: read, type: read, title: Read, auto: true, next: update}
+  - {id: update, type: update, title: Update the email, next: done}
+  - {id: done, type: end, title: Finished}
+# condition: {id: g, type: condition, branches: [{answer: Yes, color: green, next: u}, {answer: No, next: done}]}
+```
+Step `type` → BPMN: `read`→get-data, `update`→update-data, `guidance`→guideline,
+`action`→trigger-action, `mcp`→mcp-server (needs `mcpServerId`), `load-related`→
+load-related-record, `condition`→exclusiveGateway (≥2 branches), `escalation`→
+intermediateThrowEvent (needs `inboxId`), `end`→endEvent. `auto:true` →
+fully-automated (else automated-with-confirmation); `prompt` → forest:description.
+**Limit:** the BPMN carries structure + prompt + flags only — per-field args (read/
+update) and action wiring resolve at runtime (AI + prompt + the `trigger` input).
+
+---
+
 ## 6. HTTP error cheat-sheet
 
 - `409 active workflow run already exists … on record` → one active run per
