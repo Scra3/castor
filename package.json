@@ -8,7 +8,7 @@
     "@oclif/plugin-help": "^6",
     "yaml": "^2.9.0"
   },
-  "description": "castor — construis ton Forest avec ton compagnon castor 🦫",
+  "description": "castor — build your Forest with your castor companion 🦫",
   "devDependencies": {
     "@oclif/prettier-config": "^0.2.1",
     "@oclif/test": "^3",

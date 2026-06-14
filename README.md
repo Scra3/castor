@@ -1,119 +1,117 @@
 castor 🦫
 =========
 
-**Construis ton Forest avec ton compagnon castor.**
+**Build your Forest with your castor companion.**
 
-`castor` est une CLI (oclif, TypeScript, ESM) qui couvre tout le cycle de vie d'un
-projet Forest Admin depuis le terminal : **onboarding** d'un projet de bout en bout,
-**layout-as-code**, **pilotage des données** de l'agent, et le **moteur de workflows**
-(création, exécution, executor).
+`castor` is a CLI (oclif, TypeScript, ESM) that covers the whole lifecycle of a Forest
+Admin project from the terminal: end-to-end **onboarding**, **layout-as-code**,
+**driving the agent's data**, and the **workflow engine** (create, run, executor).
 
-## Installation (dev)
+## Install (dev)
 
 ```sh
 yarn install
-yarn build          # tsc -> dist/  (à relancer après chaque modif)
-node ./bin/run.js <commande>
+yarn build          # tsc -> dist/  (re-run after each change)
+node ./bin/run.js <command>
 ```
 
-> Yarn 4, node-modules linker. `yarn test` ne lance PAS `yarn lint` (Yarn 4 n'exécute
-> pas les `pre/post` scripts) — lance `yarn lint` explicitement, objectif **0 erreur**.
+> Yarn 4, node-modules linker. `yarn test` does NOT run `yarn lint` (Yarn 4 doesn't run
+> `pre/post` scripts) — run `yarn lint` explicitly, target **0 errors**.
 
 ## 1. Onboarding — `init`
 
-De zéro à un agent Forest qui tourne, en une commande : connexion → création du projet
-→ base de données → génération de l'agent `agent-nodejs` → démarrage → vérification.
+From zero to a running Forest agent in one command: login → project creation → database
+→ `agent-nodejs` scaffolding → start → verification.
 
 ```sh
-# Interactif, contre la production :
-node ./bin/run.js init --name "Mon Projet"
+# Interactive, against production:
+node ./bin/run.js init --name "My Project"
 
-# Contre un serveur de dev, avec une base existante :
+# Against a dev server, reusing an existing database:
 FOREST_URL=http://localhost:3001 node ./bin/run.js init \
-  --name "Mon Projet" \
-  --database-url postgres://user:pass@localhost:5432/ma_base
+  --name "My Project" \
+  --database-url postgres://user:pass@localhost:5432/mydb
 
-# Avec un workflow executor branché d'emblée :
-node ./bin/run.js init --name "Mon Projet" --with-executor
+# With a workflow executor wired in from the start:
+node ./bin/run.js init --name "My Project" --with-executor
 ```
 
-Sans `--database-url`, une base Postgres d'exemple est provisionnée via Docker.
-Auth : `login`, `signup` (email/mot de passe ou `--oauth` Google/SSO), `logout`.
+Without `--database-url`, a sample Postgres database is provisioned via Docker.
+Auth: `login`, `signup` (email/password or `--oauth` for Google/SSO), `logout`.
 
 ## 2. Layout-as-code — `layout`
 
-Versionne et applique le layout (collections, dashboards, dossiers, workflows) comme
-du code.
+Version and apply the layout (collections, dashboards, folders, workflows) as code.
 
 ```sh
-node ./bin/run.js layout pull            # exporte le layout dans forest-layout.yml
-node ./bin/run.js layout diff            # plan des changements
-node ./bin/run.js layout apply           # applique (patch atomique par domaine)
-node ./bin/run.js layout patch --domain layout --file ops.json   # JSON Patch brut
+node ./bin/run.js layout pull            # export the layout to forest-layout.yml
+node ./bin/run.js layout diff            # plan of changes
+node ./bin/run.js layout apply           # apply (atomic patch per domain)
+node ./bin/run.js layout patch --domain layout --file ops.json   # raw JSON Patch
 ```
 
-Catalogue complet des patchs supportés : **`docs/LAYOUT-PATCHES.md`**.
+Full catalog of supported patches: **`docs/LAYOUT-PATCHES.md`**.
 
-## 3. Piloter l'agent — `agent`
+## 3. Drive the agent — `agent`
 
-Interroge et modifie les données servies par un agent qui tourne (via
-`@forestadmin/agent-client`, token forgé localement depuis le `FOREST_AUTH_SECRET`).
+Query and mutate the data served by a running agent (via `@forestadmin/agent-client`,
+with a token minted locally from `FOREST_AUTH_SECRET`).
 
 ```sh
-node ./bin/run.js agent describe customers --project-dir ./mon-projet
+node ./bin/run.js agent describe customers --project-dir ./my-project
 node ./bin/run.js agent list customers --filter '{"field":"email","operator":"Contains","value":"a"}'
 node ./bin/run.js agent create customers --data '{"email":"a@b.com"}'
 node ./bin/run.js agent export orders -o orders.csv
 ```
 
-Sous-commandes : `describe, list, get, count, create, update, delete, export,
-relation, associate, dissociate, action, chart`.
+Subcommands: `describe, list, get, count, create, update, delete, export, relation,
+associate, dissociate, action, chart`.
 
 ## 4. Workflows — `workflow`
 
-Crée, exécute et pilote le **moteur de workflow orchestrator** (uniquement sur les
-environnements en moteur `orchestrator`).
+Create, run and drive the **workflow orchestrator engine** (orchestrator-engine
+environments only).
 
 ```sh
-# Créer un workflow depuis une spec YAML (compilée en BPMN) :
-node ./bin/run.js workflow create -f workflow.yml --project "Mon Projet"
+# Create a workflow from a YAML spec (compiled to BPMN):
+node ./bin/run.js workflow create -f workflow.yml --project "My Project"
 
-# L'exécuter de bout en bout (autopilote) :
+# Run it end-to-end (autopilot):
 node ./bin/run.js workflow run --workflow <uuid> --collection customers --record 1 \
-  --project-dir ./mon-projet --inputs '{"1":{"userConfirmed":true,"value":"x@y.z"}}'
+  --project-dir ./my-project --inputs '{"1":{"userConfirmed":true,"value":"x@y.z"}}'
 
-# Installer + démarrer le workflow executor (le service qui exécute les runs) :
-node ./bin/run.js workflow setup-executor --project-dir ./mon-projet --in-memory
+# Install + start the workflow executor (the service that runs the steps):
+node ./bin/run.js workflow setup-executor --project-dir ./my-project --in-memory
 ```
 
-Exemple de spec (`workflow.yml`) :
+Example spec (`workflow.yml`):
 
 ```yaml
-name: Mettre à jour l'email
+name: Update the email
 collection: customers
 steps:
-  - {id: read, type: read, title: Lire la fiche, auto: true, next: update}
-  - {id: update, type: update, title: Mettre à jour l'email, next: done}
-  - {id: done, type: end, title: Terminé}
+  - {id: read, type: read, title: Read the record, auto: true, next: update}
+  - {id: update, type: update, title: Update the email, next: done}
+  - {id: done, type: end, title: Finished}
 ```
 
-Sous-commandes : `create, run, list, start, resume, continue, revise, abort,
+Subcommands: `create, run, list, start, resume, continue, revise, abort,
 handle-manually, escalate, trigger` + `setup-executor`.
-Le modèle d'exécution complet (machine à états, boucle de pilotage, payloads par type
-de step) est documenté dans **`docs/WORKFLOWS.md`**.
+The full runtime model (state machine, drive loop, per-step-type payloads) is documented
+in **`docs/WORKFLOWS.md`**.
 
 ## Conventions
 
-- ESM + `Node16` → les imports relatifs portent l'extension `.js`.
-- Erreurs typées (`ForestApiError`, `AuthError`, `WorkflowError`, `AgentError`, …),
-  jamais de strings brutes.
-- Effets de bord (fetch, process, prompts, horloge) **injectables** pour les tests.
-- Strings utilisateur en anglais ; ce README et le branding en français.
-- Token stocké dans `~/.config/castor/credentials.json` (0600), clé par URL de serveur.
+- ESM + `Node16` → relative imports carry the `.js` extension.
+- Typed errors (`ForestApiError`, `AuthError`, `WorkflowError`, `AgentError`, …), never
+  raw strings.
+- Side effects (fetch, processes, prompts, clock) are **injectable** for tests.
+- English everywhere — `castor` (French for "beaver") is just the brand name.
+- Token stored at `~/.config/castor/credentials.json` (0600), keyed by server URL.
 
 ## Tests
 
 ```sh
 yarn test           # mocha (test/**/*.test.ts)
-yarn lint           # eslint — 0 erreur attendu
+yarn lint           # eslint — expect 0 errors
 ```
