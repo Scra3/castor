@@ -55,6 +55,9 @@
       "public-api": {
         "description": "Read Forest's public API: activity logs, notes and admin logs (read-only)."
       },
+      "token": {
+        "description": "Create a long-lived application token for unattended/CI use."
+      },
       "workflow": {
         "description": "Drive the workflow engine orchestrator: start, resume and run the lifecycle of workflow executions (orchestrator engine only)."
       }

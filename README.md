@@ -39,6 +39,17 @@ node ./bin/run.js init --name "My Project" --with-executor
 Without `--database-url`, a sample Postgres database is provisioned via Docker.
 Auth: `login`, `signup` (email/password or `--oauth` for Google/SSO), `logout`.
 
+**Long-lived token** — the session token is short-lived; for unattended/CI use, mint a
+~100-year application token:
+
+```sh
+node ./bin/run.js token create --name "ci @my-laptop"   # prints the token
+node ./bin/run.js token create --save                   # also stores it (stay logged in)
+```
+
+Use the printed token as `$FOREST_TOKEN`, or `--save` to keep `castor` logged in without
+re-login. Treat it like a password; revoke it from the Forest UI if it leaks.
+
 ## 2. Layout-as-code — `layout`
 
 Version and apply the layout (collections, dashboards, folders, workflows) as code.
