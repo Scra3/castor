@@ -57,6 +57,19 @@ loop and the executor contend for it. To stay in control, drive with `trigger` f
 than the poll interval (a trigger-driven step leaves the run `started`/`pending`); if a
 run is wedged in `loading`, wait for the lock to expire or `workflow abort <runId>`.
 
+### Transient trigger races (retry, don't fail)
+A `trigger` can hit a window where the orchestrator has **no claimable step** for the run
+*right now* — just after `start`/`continue`, or while the 30 s poll holds it. The executor
+then returns a **transient** status, not a real failure:
+`404` (RunNotFound "not found or unavailable") · `503` (store/port transient) · `400` whose
+body matches `already being processed` (RunAlreadyInFlight). This is **not** a concurrency
+limit — the executor runs many runs in parallel; it's the orchestrator's atomic claim
+returning nothing for that instant. **Retry with backoff.** Everything else is fatal and must
+**not** be retried: other `400` (e.g. `InvalidPendingData` "request body is invalid"), `403`
+(UserMismatch), parse/network errors. (`workflow run` does this automatically —
+`isTransientTriggerError` + `triggerExecutorRunWithRetry`, `--trigger-retries`; so N parallel
+`workflow run` finish reliably without staggering launches.)
+
 ---
 
 ## 3. The drive loop (any workflow, any number/order of steps)

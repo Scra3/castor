@@ -7,7 +7,7 @@ import {driveRun} from '../../services/workflow/autopilot.js'
 import {continueWorkflow, resumeWorkflow, startWorkflow} from '../../services/workflow/client.js'
 import {printJson, withWorkflow, workflowFlags} from '../../services/workflow/command.js'
 import {WorkflowError} from '../../services/workflow/errors.js'
-import {assembleRun, fetchExecutorRun, triggerExecutorRun} from '../../services/workflow/executor-client.js'
+import {assembleRun, fetchExecutorRun, triggerExecutorRunWithRetry} from '../../services/workflow/executor-client.js'
 
 const DEFAULT_EXECUTOR_PORT = 3400
 
@@ -29,6 +29,7 @@ export default class WorkflowRun extends Command {
     inputs: Flags.string({description: 'Per-step input patches as JSON keyed by stepIndex, e.g. \'{"1":{"userConfirmed":true,"value":"x"}}\''}),
     'project-dir': Flags.string({description: 'Agent dir — reads FOREST_AUTH_SECRET to reach the executor', required: true}),
     record: Flags.string({description: 'Selected record id', required: true}),
+    'trigger-retries': Flags.integer({default: 10, description: 'Retries when the executor has no claimable step yet (transient race under parallel load)'}),
     workflow: Flags.string({description: 'Workflow id (uuid) — see `workflow list`', required: true}),
   }
 
@@ -79,7 +80,14 @@ export default class WorkflowRun extends Command {
             setTimeout(resolve, ms)
           }),
           async trigger(patch) {
-            await triggerExecutorRun({...access, pendingData: patch, runId})
+            await triggerExecutorRunWithRetry(
+              {...access, pendingData: patch, runId},
+              {
+                onRetry: (attempt, delayMs) =>
+                  this.log(`  ⟳ step not claimable yet — retry ${attempt}/${flags['trigger-retries']} in ${delayMs}ms`),
+                retries: flags['trigger-retries'],
+              },
+            )
           },
         },
         {inputs},

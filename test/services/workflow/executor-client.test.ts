@@ -1,6 +1,12 @@
 import {expect} from 'chai'
 
-import {assembleRun} from '../../../src/services/workflow/executor-client.js'
+import {WorkflowError} from '../../../src/services/workflow/errors.js'
+import {
+  ExecutorHttpError,
+  assembleRun,
+  isTransientTriggerError,
+  retryTransient,
+} from '../../../src/services/workflow/executor-client.js'
 
 describe('workflow/executor-client.assembleRun', () => {
   const executorData = {
@@ -38,5 +44,88 @@ describe('workflow/executor-client.assembleRun', () => {
   it('returns the run untouched when there is no workflowHistory array', () => {
     const run = {id: 1, runState: 'finished'}
     expect(assembleRun(run, {steps: []})).to.deep.equal(run)
+  })
+})
+
+describe('workflow/executor-client.isTransientTriggerError', () => {
+  it('treats 404 (not found/unavailable) as transient', () => {
+    expect(isTransientTriggerError(new ExecutorHttpError(404, '{"error":"Run not found or unavailable"}', 'm'))).to.equal(true)
+  })
+
+  it('treats 503 (store/port unavailable) as transient', () => {
+    expect(isTransientTriggerError(new ExecutorHttpError(503, '{"error":"please retry"}', 'm'))).to.equal(true)
+  })
+
+  it('treats 400 "already being processed" as transient', () => {
+    expect(isTransientTriggerError(new ExecutorHttpError(400, '{"error":"Run \\"5\\" is already being processed"}', 'm'))).to.equal(true)
+  })
+
+  it('treats a plain 400 (invalid request body) as fatal', () => {
+    expect(isTransientTriggerError(new ExecutorHttpError(400, '{"error":"The request body is invalid."}', 'm'))).to.equal(false)
+  })
+
+  it('treats 403 (user mismatch) as fatal', () => {
+    expect(isTransientTriggerError(new ExecutorHttpError(403, '{"error":"Forbidden"}', 'm'))).to.equal(false)
+  })
+
+  it('treats a non-HTTP error (network) as fatal', () => {
+    expect(isTransientTriggerError(new WorkflowError('executor unreachable'))).to.equal(false)
+  })
+})
+
+const noSleep = async (): Promise<void> => {}
+const transientError = (): ExecutorHttpError => new ExecutorHttpError(404, '{"error":"unavailable"}', 'transient')
+
+describe('workflow/executor-client.retryTransient', () => {
+  it('retries transient failures then resolves, with growing backoff delays', async () => {
+    let calls = 0
+    const delays: number[] = []
+    const result = await retryTransient(
+      async () => {
+        calls++
+        if (calls < 4) throw transientError()
+        return 'ok'
+      },
+      {baseDelayMs: 100, maxDelayMs: 10_000, onRetry: (_a, ms) => delays.push(ms), random: () => 1, sleep: noSleep},
+    )
+
+    expect(result).to.equal('ok')
+    expect(calls).to.equal(4)
+    // full jitter at random()=1 → exactly the ceiling: 100, 200, 400
+    expect(delays).to.deep.equal([100, 200, 400])
+  })
+
+  it('rethrows a fatal error immediately without sleeping', async () => {
+    let calls = 0
+    let slept = false
+    const recordingSleep = async (): Promise<void> => {
+      slept = true
+    }
+
+    const error = await retryTransient(
+      async () => {
+        calls++
+        throw new ExecutorHttpError(400, '{"error":"The request body is invalid."}', 'fatal')
+      },
+      {sleep: recordingSleep},
+    ).catch((error_: unknown) => error_)
+
+    expect(calls).to.equal(1)
+    expect(slept).to.equal(false)
+    expect((error as ExecutorHttpError).status).to.equal(400)
+  })
+
+  it('rethrows the last transient error after exhausting retries', async () => {
+    let calls = 0
+    const error = await retryTransient(
+      async () => {
+        calls++
+        throw transientError()
+      },
+      {random: () => 0, retries: 2, sleep: noSleep},
+    ).catch((error_: unknown) => error_)
+
+    expect(calls).to.equal(3) // 1 initial + 2 retries
+    expect((error as ExecutorHttpError).status).to.equal(404)
   })
 })

@@ -32,6 +32,8 @@ src/
     signup.ts      # create an account (email/pass via API, or --oauth in browser)
     login.ts       # authenticate and store the token
     logout.ts      # clear the stored token
+    token/create.ts # mint a long-lived application token (~100y); --save persists it
+    public-api/    # read Forest's public API: activity-logs/notes/admin-logs (read-only)
     agent/         # talk to a RUNNING agent: describe/list/get/count/create/update/
                    #   delete/export/relation/associate/dissociate/action/chart
     workflow/      # drive the workflow engine orchestrator: list/start/resume/continue/
@@ -184,6 +186,16 @@ type, error cheat-sheet), learned by driving real runs.
   triggerable/continuable. Driving each step with `trigger` keeps it `started`/`pending`.
   Typical loop: `start` → `trigger` (run step 0) → `continue` (advance to next) →
   `trigger --data {userConfirmed,value}` (confirm/supply input) → … → `continue` → `finished`.
+- **A trigger can race the claim.** `POST /runs/:runId/trigger` asks the orchestrator to
+  atomically claim the current step; if none is claimable *at that instant* (just after
+  `start`/`continue`, or the executor's 30s poll holds it) it returns **404** "not found or
+  unavailable" (also **503** store-transient, **400** "already being processed"). This is a
+  timing race, NOT an executor concurrency limit (the executor runs many runs in parallel).
+  `workflow run` retries these transients with backoff (`triggerExecutorRunWithRetry` /
+  `isTransientTriggerError` in `executor-client.ts`, `--trigger-retries`, default 10, sized to
+  outlast one poll cycle). Other 400s (e.g. `InvalidPendingData` "request body is invalid"),
+  403, and network errors are **fatal — never retried**. So 10 parallel `workflow run` finish
+  reliably without a launch stagger.
 
 ### `workflow setup-executor` — install + run the executor
 The orchestrator only does work if a **workflow executor** is running (it polls the
@@ -265,7 +277,7 @@ All JSON.
 | Env secret | `GET /api/environments/:id/secretKey` | → `{secretKey}` (flat JSON) = `FOREST_ENV_SECRET` |
 | Set endpoint | `PUT /api/environments/:id` JSON:API `{apiEndpoint}` | declare where the agent listens |
 | Verify | `GET /api/environments/:id` | read `is_active` (see snake_case gotcha) |
-| App token | `POST /api/application-tokens` JSON:API `{name}` (Bearer = OIDC access token) | → `data.attributes.token` (long-lived) |
+| App token | `POST /api/application-tokens` JSON:API `{name}` (Bearer = **session JWT or** OIDC token) | → `data.attributes.token` (long-lived ~100y, returned once). `token create` mints one from a normal session; `GET`/`DELETE /api/application-tokens/:id` list/revoke |
 | OIDC | `GET /oidc/.well-known/openid-configuration`, `POST /oidc/reg`, `POST /oidc/device/auth`, `POST /oidc/token` | JSON bodies; device grant supported |
 
 ## GOTCHAS (learned the hard way — do not re-discover)
